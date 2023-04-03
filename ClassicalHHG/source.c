@@ -12,7 +12,7 @@ const double Txuv = 0.55; // время XUV, фс
 const double Tir = 20;    // время IR, фс
 const double delay = 2 * M_PI; // задержка между XUV и IR, фс
 
-#define monochromate 1 // 1 - если монохромат, 0 - если импульсы
+#define monochromate 0 // 1 - если монохромат, 0 - если импульсы
 #define N 5            // количество максимумов
 #define M 500          // количество точек справа (слева) данного максимума
 #define O 5 * 500 * 2  // всего сколько точек справа и слева каждого максимума
@@ -161,13 +161,13 @@ int max_t(double max_t1[], double max_t2[], double max_hhg[], double C)
 	return 0;
 }
 
-void saveHHG(int n, double array_t2[], double array_E[], char* name)
+void writeFILE(int n, double array_x[], double array_y[], char * name)
 {
-	FILE* fp;
+	FILE * fp;
 	fp = fopen(name, "w");
 	for (int i = 0; i < n; i++)
 	{
-		fprintf(fp, "%e  %e\n", array_t2[i], array_E[i]);
+		fprintf(fp, "%e  %e\n", array_x[i], array_y[i]);
 	}
 	fclose(fp);
 }
@@ -198,8 +198,8 @@ int main(void)
 	int o = 0;
 	double dE = max_hhg[0] / M;
 
-	double array_E[O];
-	double array_t2[O];
+	double array_y[O];
+	double array_x[O];
 
 	const size_t n = 2;
 	gsl_multiroot_function func = 
@@ -216,7 +216,6 @@ int main(void)
 	for (int i = M; i > 0; i--) 
 	{
 		double E = i * dE;
-
 		for (int j = 0; j < N; j++)
 		{
 			if (E > max_hhg[j])
@@ -251,15 +250,38 @@ int main(void)
 
 				if (status == GSL_SUCCESS)
 				{
-					array_t2[o] = gsl_vector_get(s->x, 1);
-					array_E[o] = E;
+					array_x[o] = gsl_vector_get(s->x, 1);
+					array_y[o] = E;
 					o++;
 				}
 			}
 		}
 	}
+	writeFILE(o, array_x, array_y, "HHG.txt");
 
-	saveHHG(o, array_t2, array_E, "HHG.txt");
+	int D = 1000;
+	double dt = Tir / D;
+
+	for (int i = 0; i < D; i++)
+	{
+		array_x[i] = i * dt;
+		array_y[i] = 40 * F(i * dt);
+	}
+	writeFILE(D, array_x, array_y, "F.txt");
+
+	for (int i = 0; i < D; i++)
+	{
+		array_x[i] = i * dt;
+		array_y[i] = 40 * A(i * dt, C);
+	}
+	writeFILE(D, array_x, array_y, "A.txt");
+
+	for (int i = 0; i < D; i++)
+	{
+		array_x[i] = i * dt;
+		array_y[i] = 40 * IntA(i * dt, C);
+	}
+	writeFILE(D, array_x, array_y, "Q.txt");
 
 	gsl_multiroot_fsolver_free(s);
 	gsl_vector_free(x);
