@@ -1,0 +1,3 @@
+cd "C://Users/User/source/repos/ClassicalHHG/ClassicalHHG"
+
+gcc "C://Users/User/source/repos/ClassicalHHG/ClassicalHHG/source.c" -lgslcblas -lgsl -lm -o HHG.exe
