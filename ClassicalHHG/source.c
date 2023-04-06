@@ -12,10 +12,10 @@ const double Wir = 1;     // частота IR, э¬
 const double Txuv = 0.55; // врем€ XUV, фс
 const double Tir = 20;    // врем€ IR, фс
 const double delay = 2 * M_PI; // задержка между XUV и IR, фс
+int monochromate = 1;          // 1 - если монохромат, 2 - если импульсы
 #pragma endregion
 
 #pragma region параметры программы
-#define monochromate 1 // 1 - если монохромат, 0 - если импульсы
 #define N 3            // количество максимумов
 #define M 500          // количество точек справа (слева) данного максимума
 #define O (N * M) * 2  // всего сколько точек справа и слева каждого максимума
@@ -118,8 +118,11 @@ int HHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 	const double t1 = gsl_vector_get(x, 0);
 	const double t2 = gsl_vector_get(x, 1);
 
-	const double e1 = (2 * Up * pow(P(t1, t1, t2, C), 2)) - Wxuv + Ip;
-	const double e2 = (2 * Up * pow(P(t2, t1, t2, C), 2)) - E/* + Ip*/;
+	//const double e1 = (2 * Up * pow(P(t1, t1, t2, C), 2)) - Wxuv + Ip;
+	const double e2 = (2 * Up * pow(P(t2, t1, t2, C), 2)) - E;
+
+	const double e1 = P(t1, t1, t2, C) - k;
+	//const double e2 = P(t2, t1, t2, C) - sqrt((E) / (2 * Up));
 
 	gsl_vector_set(func, 0, e1);
 	gsl_vector_set(func, 1, e2);
@@ -204,6 +207,17 @@ void writeFILE(int n, double array_x[], double array_y[], char * name)
 
 int main(void)
 {
+    #pragma region импульсы или монохромат
+	printf("1 - monochromate, 2 - impulses\n  ");
+	do
+	{
+		scanf("%d", &monochromate);
+		printf("  ");
+	} 
+	while (monochromate != 1 && monochromate != 2);
+	printf("\n\n");
+    #pragma endregion
+
     #pragma region определение константы C
 	double C = -1;
 	for (int i = 0; i < M; i++)
