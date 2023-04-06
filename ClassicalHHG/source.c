@@ -15,8 +15,8 @@ const double delay = 2 * M_PI; // задержка между XUV и IR, фс
 #pragma endregion
 
 #pragma region параметры программы
-#define monochromate 0 // 1 - если монохромат, 0 - если импульсы
-#define N 5            // количество максимумов
+#define monochromate 1 // 1 - если монохромат, 0 - если импульсы
+#define N 3            // количество максимумов
 #define M 500          // количество точек справа (слева) данного максимума
 #define O (N * M) * 2  // всего сколько точек справа и слева каждого максимума
 #pragma endregion
@@ -30,7 +30,7 @@ struct parameters
 };
 #pragma endregion
 
-#pragma region функции, задающие IR-поле
+#pragma region функции, задающие IR-поле и импульс электрона
 double F(double t)
 {
 	if (monochromate == 1)
@@ -76,6 +76,11 @@ double Q(double t1, double t2, double C)
 
 	return -(IntA(t2, C) - IntA(t1, C)) / (t2 - t1);
 }
+
+double P(double t, double t1, double t2, double C)
+{
+	return A(t, C) + Q(t1, t2, C);
+}
 #pragma endregion
 
 #pragma region максимальная гармоника
@@ -94,7 +99,7 @@ int maxHHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 	const double t1 = gsl_vector_get(x, 0);
 	const double t2 = gsl_vector_get(x, 1);
 
-	const double e1 = A(t1, C) + Q(t1, t2, C);
+	const double e1 = P(t1, t1, t2, C);
 	const double e2 = F(t2) + ((A(t2, C) - A(t1, C)) / (t2 - t1));
 
 	gsl_vector_set(func, 0, e1);
@@ -113,8 +118,8 @@ int HHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 	const double t1 = gsl_vector_get(x, 0);
 	const double t2 = gsl_vector_get(x, 1);
 
-	const double e1 = A(t1, C) + Q(t1, t2, C) - k;
-	const double e2 = (2 * Up * pow(Q(t1, t2, C) + A(t2, C), 2)) - E/* + Ip*/;
+	const double e1 = (2 * Up * pow(P(t1, t1, t2, C), 2)) - Wxuv + Ip;
+	const double e2 = (2 * Up * pow(P(t2, t1, t2, C), 2)) - E/* + Ip*/;
 
 	gsl_vector_set(func, 0, e1);
 	gsl_vector_set(func, 1, e2);
