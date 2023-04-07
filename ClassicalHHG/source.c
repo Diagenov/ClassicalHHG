@@ -4,6 +4,14 @@
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_multiroots.h>
 
+// либо это:
+//   1) идти снизу вверх
+//       + сверху вниз втора€ ветка может пойти по тому же пути, что перва€
+//       + позволит не рассчитывать максимальную энергию, а определ€ть ее по построению
+//       - непон€тно, как выбирать начальные услови€
+// либо это:
+//   2) на каждом шаге давать приращение начальным услови€м, а не только на первом
+
 #pragma region параметры IR, XUV и атома
 const double Up = 53.74;  // пондермоторна€ энерги€, э¬
 const double Ip = 21.55;  // потенциал ионизации (Ne) э¬
@@ -11,6 +19,7 @@ const double Wxuv = 30;   // частота XUV, э¬
 const double Wir = 1;     // частота IR, э¬
 const double Txuv = 0.55; // врем€ XUV, фс
 const double Tir = 20;    // врем€ IR, фс
+const double fi = 0 * M_PI / 2; // относительна€ фаза огибающей
 #pragma endregion
 
 #pragma region выбор случа€ (монохромат, импульсы, IR, IR + XUV)
@@ -48,7 +57,7 @@ double F(double t)
 	if (t < 0 || t > Tir)
 		return 0;
 
-	return cos(t) * pow(sin(M_PI * t / Tir), 2);
+	return cos(t - fi) * pow(sin(M_PI * t / Tir), 2);
 }
 
 double A(double t, double C)
@@ -61,7 +70,7 @@ double A(double t, double C)
 
 	double a1 = (2 * M_PI / Tir) + 1;
 	double a2 = (2 * M_PI / Tir) - 1;
-	double y = (sin(t) / 2) - (sin(a1 * t) / (4 * a1)) - (sin(a2 * t) / (4 * a2)) + C;
+	double y = (sin(t - fi) / 2) - (sin(a1 * t - fi) / (4 * a1)) - (sin(a2 * t + fi) / (4 * a2)) + C;
 	return -y;
 }
 
@@ -75,7 +84,7 @@ double IntA(double t, double C)
 
 	double a1 = (2 * M_PI / Tir) + 1;
 	double a2 = (2 * M_PI / Tir) - 1;
-	return (cos(t) / 2) - (cos(a1 * t) / (4 * a1 * a1)) - (cos(a2 * t) / (4 * a2 * a2)) + (C * t);
+	return (cos(t - fi) / 2) - (cos(a1 * t - fi) / (4 * a1 * a1)) - (cos(a2 * t + fi) / (4 * a2 * a2)) + (C * t);
 }
 
 double Q(double t1, double t2, double C)
@@ -89,6 +98,13 @@ double Q(double t1, double t2, double C)
 double P(double t, double t1, double t2, double C)
 {
 	return A(t, C) + Q(t1, t2, C);
+}
+
+double deltaE(double t1, double t2, double C)
+{
+	double sqrK = 2 * Ip;
+	double a = sqrK / (t2 - t1);
+	return a * P(t2, t1, t2, C) / (Wir * F(t1));
 }
 #pragma endregion
 
@@ -128,11 +144,17 @@ int HHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 	const double t1 = gsl_vector_get(x, 0);
 	const double t2 = gsl_vector_get(x, 1);
 
-	const double e1 = k == 0 ? 
-		P(t1, t1, t2, C) : 
-		(2 * Up * pow(P(t1, t1, t2, C), 2)) - (Wxuv - Ip);
-	const double e2 = (2 * Up * pow(P(t2, t1, t2, C), 2)) - (E/* - Ip*/);
-
+	double e1, e2;
+	if (k == 0)
+	{
+		e1 = P(t1, t1, t2, C);
+		e2 = (2 * Up * pow(P(t2, t1, t2, C), 2)) - (E/* - Ip*/)/* + (deltaE(t1, t2, C) / 2)*/;
+	}
+	else
+	{
+		e1 = (2 * Up * pow(P(t1, t1, t2, C), 2)) - (Wxuv - Ip);
+		e2 = (2 * Up * pow(P(t2, t1, t2, C), 2)) - (E/* - Ip*/);
+	}
 	gsl_vector_set(func, 0, e1);
 	gsl_vector_set(func, 1, e2);
 
@@ -196,7 +218,9 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_hhg[N
 
 			max_t1[i][0] = max_t1[i][1] = t1;
 			max_t2[i][0] = max_t2[i][1] = t2;
-			double hhg = max_hhg[i] = maxHHG(t1, t2, C);
+
+			double hhg = maxHHG(t1, t2, C);
+			max_hhg[i] = hhg/* + Ip*/;
 
 			printf("t1 = %.3e \n", t1);
 			printf("t2 = %.3e \n", t2);
@@ -380,7 +404,7 @@ int work()
     #pragma region построение траекторий
 	for (int i = 0; ; i++)
 	{
-		double to1 = i * M_PI;
+		double to1 = fi + (i * M_PI);
 		if (to1 > Tir)
 			break;
 
