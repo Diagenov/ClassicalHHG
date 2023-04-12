@@ -19,8 +19,8 @@ const double Ip = 21.55;  // потенциал ионизации (Ne) э¬
 const double Wxuv = 30;   // частота XUV, э¬
 const double Wir = 1;     // частота IR, э¬
 const double Txuv = 0.55; // врем€ XUV, фс
-const double Tir = 7 * M_PI;    // врем€ IR, фс
-const double fi = 0 * M_PI_2; // относительна€ фаза огибающей
+double Tir = 7 * M_PI;    // врем€ IR, фс
+double fi = 0 * M_PI_2; // относительна€ фаза огибающей
 #pragma endregion
 
 #pragma region выбор случа€ (монохромат, импульсы, IR, IR + XUV)
@@ -433,6 +433,22 @@ int work()
 	printf("\n\n");
     #pragma endregion
 
+    #pragma region длина импульса
+	if (monochromate == 2)
+	{
+		int i = 0;
+		printf("Impulse length (N * PI)\n");
+		do
+		{
+			printf("  N = ");
+			scanf("%d", &i);
+		} 
+		while (i < 0 || i > 10);
+		Tir = i * M_PI;
+		printf("\n\n");
+	}
+    #pragma endregion
+
     #pragma region IR или IR + XUV
 	printf("1 - IR, 2 - IR + XUV\n  ");
 	do
@@ -442,6 +458,21 @@ int work()
 	} 
 	while (xuv_ir != 1 && xuv_ir != 2);
 	printf("\n\n");
+    #pragma endregion
+
+    #pragma region момент ионизации
+	int n = -1;
+	if (xuv_ir == 2)
+	{
+		printf("Ionization time (N * PI)\n");
+		do
+		{
+			printf("  N = ");
+			scanf("%d", &n);
+		} 
+		while (n < 0 || n > 10);
+		printf("\n\n");
+	}
     #pragma endregion
 
     #pragma region определение константы C
@@ -460,7 +491,7 @@ int work()
     #pragma endregion
 
     #pragma region построение траекторий
-	for (int i = 0;/* i < 3*/; i++)
+	for (int i = n < 0 ? 0 : n; n < 0 || i < n + 1; i++)
 	{
 		double to1 = fi + (i * M_PI);
 		if (to1 > Tir)
