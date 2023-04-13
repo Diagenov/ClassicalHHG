@@ -19,7 +19,7 @@ const double Ip = 21.55;  // потенциал ионизации (Ne) э¬
 const double Wxuv = 30;   // частота XUV, э¬
 const double Wir = 1;     // частота IR, э¬
 const double Txuv = 0.55; // врем€ XUV, фс
-double Tir = 7 * M_PI;    // врем€ IR, фс
+double Tir = 20;    // врем€ IR, фс
 double fi = 0 * M_PI_2; // относительна€ фаза огибающей
 #pragma endregion
 
@@ -55,7 +55,7 @@ double C = -1;
 double F(double t)
 {
 	if (monochromate == 1)
-		return cos(t);
+		return cos(t - fi);
 
 	if (t < 0 || t > Tir)
 		return 0;
@@ -66,7 +66,7 @@ double F(double t)
 double A(double t)
 {
 	if (monochromate == 1)
-		return -sin(t);
+		return -sin(t - fi);
 
 	if (t < 0 || t > Tir)
 		return 0;
@@ -80,7 +80,7 @@ double A(double t)
 double IntA(double t, double c)
 {
 	if (monochromate == 1)
-		return cos(t);
+		return cos(t - fi);
 
 	if (t < 0 || t > Tir)
 		return 0;
@@ -354,7 +354,7 @@ int trajectories(double to1)
 				max_t2[i][j] = t2;
 
 				array_t[nextIndex] = t2;
-				array_E[nextIndex] = E;
+				array_E[nextIndex] = E + Ip;
 				nextIndex++;
 			}
 		}
@@ -390,7 +390,7 @@ void writeFILE()
 	for (int i = 0; i < K; i++)
 	{
 		double t = i * dt;
-		fprintf(fp, "%e  %e\n", t, F(t));
+		fprintf(fp, "%e  %e\n", t, 35 * F(t));
 	}
 	fclose(fp);
     #pragma endregion
@@ -400,7 +400,7 @@ void writeFILE()
 	for (int i = 0; i < K; i++)
 	{
 		double t = i * dt;
-		fprintf(fp, "%e  %e\n", t, A(t));
+		fprintf(fp, "%e  %e\n", t, 35 * A(t));
 	}
 	fclose(fp);
     #pragma endregion
@@ -423,11 +423,11 @@ int main(void)
 int work()
 {
     #pragma region импульсы или монохромат
-	printf("1 - monochromate, 2 - impulses\n  ");
+	printf("1 - monochromate, 2 - impulses\n");
 	do
 	{
-		scanf("%d", &monochromate);
 		printf("  ");
+		scanf("%d", &monochromate);
 	} 
 	while (monochromate != 1 && monochromate != 2);
 	printf("\n\n");
@@ -436,25 +436,23 @@ int work()
     #pragma region длина импульса
 	if (monochromate == 2)
 	{
-		int i = 0;
-		printf("Impulse length (N * PI)\n");
+		printf("Impulse length\n");
 		do
 		{
-			printf("  N = ");
-			scanf("%d", &i);
+			printf("  ");
+			scanf("%lf", &Tir);
 		} 
-		while (i < 0 || i > 10);
-		Tir = i * M_PI;
+		while (Tir < 0 || Tir > 30);
 		printf("\n\n");
 	}
     #pragma endregion
 
     #pragma region IR или IR + XUV
-	printf("1 - IR, 2 - IR + XUV\n  ");
+	printf("1 - IR, 2 - IR + XUV\n");
 	do
 	{
-		scanf("%d", &xuv_ir);
 		printf("  ");
+		scanf("%d", &xuv_ir);
 	} 
 	while (xuv_ir != 1 && xuv_ir != 2);
 	printf("\n\n");
@@ -475,15 +473,27 @@ int work()
 	}
     #pragma endregion
 
-    #pragma region определение константы C
-	for (int i = 0; i < 1000; i++)
+    #pragma region относительна€ фаза огибающей
+	printf("Carrier-envelope phase\n");
+	do
 	{
-		double c = (i * 2.0 / 1000) - 1;
+		printf("  ");
+		scanf("%lf", &fi);
+	} 
+	while (fi < 0 || fi > 2 * M_PI);
+	printf("\n\n");
+    #pragma endregion
+
+    #pragma region определение константы C
+	for (int i = 0; i < 2000; i++)
+	{
+		double c = (i * 2.0 / 2000) - 1;
 		if (abs(IntA(Tir, C) - IntA(0, C)) > abs(IntA(Tir, c) - IntA(0, c)))
 		{
 			C = c;
 		}
 	}
+	//C = 0.60556;
     #pragma endregion
 
     #pragma region параметр  елдыша (модифицированный, XUV + IR)
