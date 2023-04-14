@@ -14,11 +14,11 @@
 //   2) на каждом шаге давать приращение начальным услови€м, а не только на первом
 
 #pragma region параметры IR, XUV и атома
-const double Up = 53.74;  // пондермоторна€ энерги€, э¬
-const double Ip = 21.55;  // потенциал ионизации (Ne) э¬
-const double Wxuv = 30;   // частота XUV, э¬
-const double Wir = 1;     // частота IR, э¬
-const double Txuv = 0.55; // врем€ XUV, фс
+double Up = 53.74;  // пондермоторна€ энерги€, э¬
+double Ip = 21.55;  // потенциал ионизации (Ne) э¬
+double Wxuv = 30;   // частота XUV, э¬
+double Wir = 1;     // частота IR, э¬
+double Txuv = 0.55; // врем€ XUV, фс
 double Tir = 20;    // врем€ IR, фс
 double fi = 0 * M_PI_2; // относительна€ фаза огибающей
 #pragma endregion
@@ -60,7 +60,7 @@ double F(double t)
 	if (t < 0 || t > Tir)
 		return 0;
 
-	return cos(t - fi) * pow(sin(M_PI * t / Tir), 2);
+	return cos(Wir * t - fi) * pow(sin(M_PI * t / Tir), 2);
 }
 
 double A(double t)
@@ -71,10 +71,13 @@ double A(double t)
 	if (t < 0 || t > Tir)
 		return 0;
 
-	double a1 = (2 * M_PI / Tir) + 1;
-	double a2 = (2 * M_PI / Tir) - 1;
-	double y = (sin(t - fi) / 2) - (sin(a1 * t - fi) / (4 * a1)) - (sin(a2 * t + fi) / (4 * a2)) + C;
-	return -y;
+	double a1 = Wir + (2 * M_PI / Tir);
+	double a2 = Wir - (2 * M_PI / Tir);
+
+	double y1 = sin(Wir * t - fi) / (2 * Wir);
+	double y2 = -sin(a1 * t - fi) / (4 * a1);
+	double y3 = -sin(a2 * t - fi) / (4 * a2);
+	return -(y1 + y2 + y3) + C;
 }
 
 double IntA(double t, double c)
@@ -85,9 +88,13 @@ double IntA(double t, double c)
 	if (t < 0 || t > Tir)
 		return 0;
 
-	double a1 = (2 * M_PI / Tir) + 1;
-	double a2 = (2 * M_PI / Tir) - 1;
-	return (cos(t - fi) / 2) - (cos(a1 * t - fi) / (4 * a1 * a1)) - (cos(a2 * t + fi) / (4 * a2 * a2)) + (c * t);
+	double a1 = Wir + (2 * M_PI / Tir);
+	double a2 = Wir - (2 * M_PI / Tir);
+
+	double y1 = cos(Wir * t - fi) / (2 * Wir * Wir);
+	double y2 = -cos(a1 * t - fi) / (4 * a1 * a1);
+	double y3 = -cos(a2 * t + fi) / (4 * a2 * a2);
+	return y1 + y2 + y3 + (c * t);
 }
 
 double Q(double t1, double t2)
@@ -123,7 +130,7 @@ double sqrP(double t, void* params)
 
 double S(double t1, double t2)
 {
-	gsl_integration_workspace* w
+	gsl_integration_workspace * w
 		= gsl_integration_workspace_alloc(1000);
 
 	double result, error;
@@ -226,7 +233,7 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 
 	for (int i = 0; i < N; i++)
 	{
-		double to2 = to1 + ((2 + i) * M_PI) - M_PI_2;
+		double to2 = to1 + (i * M_PI / Wir) + (M_PI_2 / Wir);
 		if (to2 > Tir)
 			break;
 
@@ -256,8 +263,8 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 				continue;
 
 			max_t1[count][0] = max_t1[count][1] = t1;
-			max_t2[count][0] = t2 - 0.3;
-			max_t2[count][1] = t2 + 0.3;
+			max_t2[count][0] = t2;
+			max_t2[count][1] = t2;
 			max_e[count] = hhg;
 
 			printf("t1 = %.3e \n", t1);
@@ -265,11 +272,11 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 			printf("t = %.3e \n", t2 - t1);
 			if (xuv_ir == 1)
 			{
-				printf("maxHHG = %.3e Up = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), hhg);
+				printf("maxE = %.3e Up = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), hhg);
 			}
 			else
 			{
-				printf("maxHHG = %.3e Up  +  %.3e (Wxuv - Ip) = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), (F(t2) / F(t1)), hhg);
+				printf("maxE = %.3e Up  +  %.3e (Wxuv - Ip) = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), (F(t2) / F(t1)), hhg);
 			}
 			count++;
 		}
@@ -313,12 +320,15 @@ int trajectories(double to1)
     #pragma region отрисовка траекторий
 	for (int i = 0; i < n; i++)
 	{
-		array_t[nextIndex] = max_t2[i][0] + 0.3;
-		array_E[nextIndex] = max_e[i];
+		array_t[nextIndex] = max_t2[i][0];
+		array_E[nextIndex] = max_e[i] + Ip;
 		nextIndex++;
 
 		for (int j = 0; j < 2; j++)
 		{
+			int sign = 2 * j - 1;
+			max_t2[i][j] += sign * 0.25;
+
 			for (int E = (int)max_e[i]; E > 0; E--)
 			{
 				struct parameters p = { E, 0, 0 };
@@ -346,9 +356,6 @@ int trajectories(double to1)
 				
 				double t1 = gsl_vector_get(s->x, 0);
 				double t2 = gsl_vector_get(s->x, 1);
-
-				if (abs(max_t2[i][j] - t2) > M_PI_4)
-					break;
 
 				max_t1[i][j] = t1;
 				max_t2[i][j] = t2;
@@ -473,6 +480,17 @@ int work()
 	}
     #pragma endregion
 
+    #pragma region несуща€ частота IR-пол€
+	printf("Carrier frequency of IR (eV)\n");
+	do
+	{
+		printf("  ");
+		scanf("%lf", &Wir);
+	} 
+	while (Wir < 0.1 || Wir > 5);
+	printf("\n\n");
+    #pragma endregion
+
     #pragma region относительна€ фаза огибающей
 	printf("Carrier-envelope phase\n");
 	do
@@ -488,28 +506,27 @@ int work()
 	for (int i = 0; i < 2000; i++)
 	{
 		double c = (i * 2.0 / 2000) - 1;
-		if (abs(IntA(Tir, C) - IntA(0, C)) > abs(IntA(Tir, c) - IntA(0, c)))
+		if (fabs(IntA(Tir, C) - IntA(0, C)) > fabs(IntA(Tir, c) - IntA(0, c)))
 		{
 			C = c;
 		}
 	}
-	//C = 0.60556;
     #pragma endregion
 
-    #pragma region параметр  елдыша (модифицированный, XUV + IR)
-	const double k = xuv_ir == 1 ? 0 : sqrt((Wxuv - Ip) / (2 * Up)); 
+    #pragma region определение пондермоторной энергии
+	Up = 9.33 * 4 * pow(1.240 / Wir, 2); // 9.33 * I[¬т/см^2 * 10^14] * lyambda[мкм]^2
     #pragma endregion
 
     #pragma region построение траекторий
 	for (int i = n < 0 ? 0 : n; n < 0 || i < n + 1; i++)
 	{
-		double to1 = fi + (i * M_PI);
+		double to1 = fi + (i * M_PI / Wir);
 		if (to1 > Tir)
 			break;
 
 		printf("\n\nstart t1 = %d * PI\n", i);
 		printf("------------------\n", i);
-		if (trajectories(to1) == 0)
+		if (fabs(F(to1)) < 0.1 || trajectories(to1) == 0)
 		{
 			printf("nothing\n");
 		}
