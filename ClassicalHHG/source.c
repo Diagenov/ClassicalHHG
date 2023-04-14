@@ -55,29 +55,29 @@ double C = -1;
 double F(double t)
 {
 	if (monochromate == 1)
-		return cos(t - fi);
+		return cos((Wir * t) - fi);
 
 	if (t < 0 || t > Tir)
 		return 0;
 
-	return cos(Wir * t - fi) * pow(sin(M_PI * t / Tir), 2);
+	return cos((Wir * t) - fi) * pow(sin(M_PI * t / Tir), 2);
 }
 
 double A(double t)
 {
 	if (monochromate == 1)
-		return -sin(t - fi);
+		return -sin((Wir * t) - fi);
 
 	if (t < 0 || t > Tir)
 		return 0;
 
-	double a1 = Wir + (2 * M_PI / Tir);
-	double a2 = Wir - (2 * M_PI / Tir);
+	double a1 = (2 * M_PI / (Wir * Tir)) + 1;
+	double a2 = (2 * M_PI / (Wir * Tir)) - 1;
 
-	double y1 = sin(Wir * t - fi) / (2 * Wir);
-	double y2 = -sin(a1 * t - fi) / (4 * a1);
-	double y3 = -sin(a2 * t - fi) / (4 * a2);
-	return -(y1 + y2 + y3) + C;
+	double y1 = -sin((Wir * t) - fi) / 2;
+	double y2 = sin((a1 * Wir * t) + fi) / (4 * a1);
+	double y3 = sin((a2 * Wir * t) + fi) / (4 * a2);
+	return y1 + y2 + y3 + C;
 }
 
 double IntA(double t, double c)
@@ -88,12 +88,12 @@ double IntA(double t, double c)
 	if (t < 0 || t > Tir)
 		return 0;
 
-	double a1 = Wir + (2 * M_PI / Tir);
-	double a2 = Wir - (2 * M_PI / Tir);
+	double a1 = (2 * M_PI / (Wir * Tir)) + 1;
+	double a2 = (2 * M_PI / (Wir * Tir)) - 1;
 
-	double y1 = cos(Wir * t - fi) / (2 * Wir * Wir);
-	double y2 = -cos(a1 * t - fi) / (4 * a1 * a1);
-	double y3 = -cos(a2 * t + fi) / (4 * a2 * a2);
+	double y1 = cos((Wir * t) - fi) / (2 * Wir);
+	double y2 = -cos((a1 * Wir * t) + fi) / (4 * Wir * a1 * a1);
+	double y3 = -cos((a2 * Wir * t) + fi) / (4 * Wir * a2 * a2);
 	return y1 + y2 + y3 + (c * t);
 }
 
@@ -233,7 +233,7 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 
 	for (int i = 0; i < N; i++)
 	{
-		double to2 = to1 + (i * M_PI / Wir) + (M_PI_2 / Wir);
+		double to2 = to1 + ((2 + i) * M_PI / Wir) - (M_PI_2 / Wir);
 		if (to2 > Tir)
 			break;
 
@@ -481,36 +481,38 @@ int work()
     #pragma endregion
 
     #pragma region несущая частота IR-поля
-	printf("Carrier frequency of IR (eV)\n");
+	/*printf("Carrier frequency of IR (eV)\n");
 	do
 	{
 		printf("  ");
 		scanf("%lf", &Wir);
 	} 
 	while (Wir < 0.1 || Wir > 5);
-	printf("\n\n");
+	printf("\n\n");*/
     #pragma endregion
 
     #pragma region относительная фаза огибающей
-	printf("Carrier-envelope phase\n");
+	/*printf("Carrier-envelope phase\n");
 	do
 	{
 		printf("  ");
 		scanf("%lf", &fi);
 	} 
 	while (fi < 0 || fi > 2 * M_PI);
-	printf("\n\n");
+	printf("\n\n");*/
     #pragma endregion
 
     #pragma region определение константы C
 	for (int i = 0; i < 2000; i++)
 	{
-		double c = (i * 2.0 / 2000) - 1;
+		double c = (i * 1.0 / 2000) - 0.5;
 		if (fabs(IntA(Tir, C) - IntA(0, C)) > fabs(IntA(Tir, c) - IntA(0, c)))
 		{
 			C = c;
 		}
 	}
+	printf("C = %e\n\n", C);
+	printf("IntA from 0 to %e = %e\n\n", Tir, IntA(Tir, C) - IntA(0, C));
     #pragma endregion
 
     #pragma region определение пондермоторной энергии
