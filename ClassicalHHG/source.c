@@ -14,13 +14,12 @@
 //   2) на каждом шаге давать приращение начальным услови€м, а не только на первом
 
 #pragma region параметры IR, XUV и атома
-double Up = 53.74;  // пондермоторна€ энерги€, э¬
-double Ip = 21.55;  // потенциал ионизации (Ne) э¬
-double Wxuv = 30;   // частота XUV, э¬
-double Wir = 1;     // частота IR, э¬
-double Txuv = 0.55; // врем€ XUV, фс
+const double Up = 57.38;  // пондермоторна€ энерги€, э¬
+const double Ip = 21.55;  // потенциал ионизации (Ne) э¬
+const double Wxuv = 30;   // частота XUV, э¬
+const double Wir = 1;     // частота IR, э¬
+const double Txuv = 0.55; // врем€ XUV, фс
 double Tir = 20;    // врем€ IR, фс
-double fi = 0 * M_PI_2; // относительна€ фаза огибающей
 #pragma endregion
 
 #pragma region выбор случа€ (монохромат, импульсы, IR, IR + XUV)
@@ -29,7 +28,7 @@ int xuv_ir = 1;       // 1 - если IR, 2 - если IR + XUV
 #pragma endregion
 
 #pragma region параметры программы
-#define N 5     // количество максимумов
+#define N 6     // количество максимумов
 #define M 100   // количество точек на одну ветку
 #define D 10000 // ограничение на запись в файл  
 #pragma endregion
@@ -50,51 +49,51 @@ struct parameters
 #pragma endregion
 
 #pragma region функции, задающие IR-поле и импульс электрона
-double C = -1;
+double C = 0;
 
 double F(double t)
 {
 	if (monochromate == 1)
-		return cos((Wir * t) - fi);
+		return cos(t);
 
 	if (t < 0 || t > Tir)
 		return 0;
 
-	return cos((Wir * t) - fi) * pow(sin(M_PI * t / Tir), 2);
+	return cos(t) * pow(sin(M_PI * t / Tir), 2);
 }
 
 double A(double t)
 {
 	if (monochromate == 1)
-		return -sin((Wir * t) - fi);
+		return -sin(t);
 
 	if (t < 0 || t > Tir)
 		return 0;
 
-	double a1 = (2 * M_PI / (Wir * Tir)) + 1;
-	double a2 = (2 * M_PI / (Wir * Tir)) - 1;
+	double a1 = (2 * M_PI / Tir) + 1;
+	double a2 = (2 * M_PI / Tir) - 1;
 
-	double y1 = -sin((Wir * t) - fi) / 2;
-	double y2 = sin((a1 * Wir * t) + fi) / (4 * a1);
-	double y3 = sin((a2 * Wir * t) + fi) / (4 * a2);
+	double y1 = -sin(t) / 2;
+	double y2 = sin(a1 * t) / (4 * a1);
+	double y3 = sin(a2 * t) / (4 * a2);
 	return y1 + y2 + y3 + C;
 }
 
-double IntA(double t, double c)
+double IntA(double t)
 {
 	if (monochromate == 1)
-		return cos(t - fi);
+		return cos(t);
 
 	if (t < 0 || t > Tir)
 		return 0;
 
-	double a1 = (2 * M_PI / (Wir * Tir)) + 1;
-	double a2 = (2 * M_PI / (Wir * Tir)) - 1;
+	double a1 = (2 * M_PI / Tir) + 1;
+	double a2 = (2 * M_PI / Tir) - 1;
 
-	double y1 = cos((Wir * t) - fi) / (2 * Wir);
-	double y2 = -cos((a1 * Wir * t) + fi) / (4 * Wir * a1 * a1);
-	double y3 = -cos((a2 * Wir * t) + fi) / (4 * Wir * a2 * a2);
-	return y1 + y2 + y3 + (c * t);
+	double y1 = cos(t) / 2;
+	double y2 = -cos(a1 * t) / (4 * a1 * a1);
+	double y3 = -cos(a2 * t) / (4 * a2 * a2);
+	return y1 + y2 + y3 + (C * t);
 }
 
 double Q(double t1, double t2)
@@ -102,7 +101,7 @@ double Q(double t1, double t2)
 	if (t1 == t2)
 		return 0;
 
-	return -(IntA(t2, C) - IntA(t1, C)) / (t2 - t1);
+	return -(IntA(t2) - IntA(t1)) / (t2 - t1);
 }
 
 double P(double t, double t1, double t2)
@@ -112,9 +111,8 @@ double P(double t, double t1, double t2)
 
 double deltaE(double t1, double t2)
 {
-	double sqrK = 2 * Ip;
-	double a = sqrK / (t2 - t1);
-	return a * P(t2, t1, t2) / (2 * Wir * F(t1));
+	double a = Ip / (t2 - t1);
+	return a * P(t2, t1, t2) / F(t1);
 }
 #pragma endregion
 
@@ -192,12 +190,12 @@ int HHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 	if (xuv_ir == 1)
 	{
 		e1 = P(t1, t1, t2);
-		e2 = (2 * Up * pow(P(t2, t1, t2), 2)) - (E);
+		e2 = (2 * Up * pow(P(t2, t1, t2), 2)) - E;
 	}
 	else
 	{
 		e1 = (2 * Up * pow(P(t1, t1, t2), 2)) - (Wxuv - Ip);
-		e2 = (2 * Up * pow(P(t2, t1, t2), 2)) - (E);
+		e2 = (2 * Up * pow(P(t2, t1, t2), 2)) - E;
 	}
 	gsl_vector_set(func, 0, e1);
 	gsl_vector_set(func, 1, e2);
@@ -209,15 +207,10 @@ int HHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 #pragma region поиск максимумов
 int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 {
-	if (to1 > Tir)
-		return 0;
-
 	const gsl_multiroot_fsolver_type * T;
 	gsl_multiroot_fsolver * s;
 
-	int status;
 	int count = 0;
-	size_t iter = 0;
 	const size_t n = 2;
 
 	gsl_multiroot_function func =
@@ -233,7 +226,7 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 
 	for (int i = 0; i < N; i++)
 	{
-		double to2 = to1 + ((2 + i) * M_PI / Wir) - (M_PI_2 / Wir);
+		double to2 = to1 + (i * M_PI) + M_PI_2;
 		if (to2 > Tir)
 			break;
 
@@ -241,6 +234,8 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 		gsl_vector_set(x, 1, to2);
 		gsl_multiroot_fsolver_set(s, &func, x);
 
+		int status;
+		int iter = 0;
 		do
 		{
 			status = gsl_multiroot_fsolver_iterate(s);
@@ -251,35 +246,34 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 		} 
 		while (status == GSL_CONTINUE && ++iter < 1000);
 
-		if (status == GSL_SUCCESS)
+		if (status != GSL_SUCCESS)
+			continue;
+		
+		double t1 = gsl_vector_get(s->x, 0);
+		double t2 = gsl_vector_get(s->x, 1);
+		if (t1 < 0 || t2 > Tir || fabs(t2 - t1) < M_PI_4)
+			continue;
+
+		double hhg = maxHHG(t1, t2);
+		if (hhg < 5)
+			continue;
+
+		max_t1[count][0] = max_t1[count][1] = t1;
+		max_t2[count][0] = max_t2[count][1] = t2;
+		max_e[count] = hhg;
+
+		printf("t1 = %.3e \n", t1);
+		printf("t2 = %.3e \n", t2);
+		printf("t = %.3e \n", t2 - t1);
+		if (xuv_ir == 1)
 		{
-			double t1 = gsl_vector_get(s->x, 0);
-			double t2 = gsl_vector_get(s->x, 1);
-			if (t1 < 0 || t2 > Tir)
-				continue;
-
-			double hhg = maxHHG(t1, t2);
-			if (hhg < 5)
-				continue;
-
-			max_t1[count][0] = max_t1[count][1] = t1;
-			max_t2[count][0] = t2;
-			max_t2[count][1] = t2;
-			max_e[count] = hhg;
-
-			printf("t1 = %.3e \n", t1);
-			printf("t2 = %.3e \n", t2);
-			printf("t = %.3e \n", t2 - t1);
-			if (xuv_ir == 1)
-			{
-				printf("maxE = %.3e Up = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), hhg);
-			}
-			else
-			{
-				printf("maxE = %.3e Up  +  %.3e (Wxuv - Ip) = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), (F(t2) / F(t1)), hhg);
-			}
-			count++;
+			printf("maxE = %.3e Up = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), hhg);
 		}
+		else
+		{
+			printf("maxE = %.3e Up  +  %.3e (Wxuv - Ip) = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), (F(t2) / F(t1)), hhg);
+		}
+		count++;
 	}
 	gsl_multiroot_fsolver_free(s);
 	gsl_vector_free(x);
@@ -321,16 +315,18 @@ int trajectories(double to1)
 	for (int i = 0; i < n; i++)
 	{
 		array_t[nextIndex] = max_t2[i][0];
-		array_E[nextIndex] = max_e[i] + Ip;
+		array_E[nextIndex] = max_e[i];
 		nextIndex++;
 
 		for (int j = 0; j < 2; j++)
 		{
-			int sign = 2 * j - 1;
-			max_t2[i][j] += sign * 0.25;
+			double E = max_e[i];
+			int sign = (2 * j) - 1;
+			max_t2[i][j] += (sign * 0.25);
 
-			for (int E = (int)max_e[i]; E > 0; E--)
+			while (E > 0)
 			{
+				E -= 1.0;
 				struct parameters p = { E, 0, 0 };
 				func.params = &p;
 
@@ -339,8 +335,7 @@ int trajectories(double to1)
 				gsl_multiroot_fsolver_set(s, &func, x);
 
 				int status;
-				size_t iter = 0;
-
+				int iter = 0;
 				do
 				{
 					status = gsl_multiroot_fsolver_iterate(s);
@@ -361,7 +356,7 @@ int trajectories(double to1)
 				max_t2[i][j] = t2;
 
 				array_t[nextIndex] = t2;
-				array_E[nextIndex] = E + Ip;
+				array_E[nextIndex] = E;
 				nextIndex++;
 			}
 		}
@@ -384,7 +379,7 @@ void writeFILE()
 	fp = fopen("HHG.txt", "w");
 	for (int i = 0; i < nextIndex; i++)
 	{
-		fprintf(fp, "%e  %e\n", array_t[i], array_E[i]);
+		fprintf(fp, "%e  %e\n", array_t[i], array_E[i] + Ip);
 	}
 	fclose(fp);
     #pragma endregion
@@ -414,19 +409,6 @@ void writeFILE()
 }
 #pragma endregion
 
-int main(void)
-{
-	do
-	{
-		monochromate = 0;
-		xuv_ir = 0;
-		nextIndex = 0;
-		work();
-	} 
-	while (1 == 1);
-	return 0;
-}
-
 int work()
 {
     #pragma region импульсы или монохромат
@@ -440,16 +422,16 @@ int work()
 	printf("\n\n");
     #pragma endregion
 
-    #pragma region длина импульса
+    #pragma region длина IR
 	if (monochromate == 2)
 	{
-		printf("Impulse length\n");
+		printf("Impulse length (fs)\n");
 		do
 		{
 			printf("  ");
 			scanf("%lf", &Tir);
 		} 
-		while (Tir < 0 || Tir > 30);
+		while (Tir < 3 * M_PI || Tir > 10 * M_PI);
 		printf("\n\n");
 	}
     #pragma endregion
@@ -475,60 +457,25 @@ int work()
 			printf("  N = ");
 			scanf("%d", &n);
 		} 
-		while (n < 0 || n > 10);
+		while (n < 0 || n * M_PI > Tir);
 		printf("\n\n");
 	}
     #pragma endregion
 
-    #pragma region несуща€ частота IR-пол€
-	/*printf("Carrier frequency of IR (eV)\n");
-	do
-	{
-		printf("  ");
-		scanf("%lf", &Wir);
-	} 
-	while (Wir < 0.1 || Wir > 5);
-	printf("\n\n");*/
-    #pragma endregion
-
-    #pragma region относительна€ фаза огибающей
-	/*printf("Carrier-envelope phase\n");
-	do
-	{
-		printf("  ");
-		scanf("%lf", &fi);
-	} 
-	while (fi < 0 || fi > 2 * M_PI);
-	printf("\n\n");*/
-    #pragma endregion
-
     #pragma region определение константы C
-	for (int i = 0; i < 2000; i++)
-	{
-		double c = (i * 1.0 / 2000) - 0.5;
-		if (fabs(IntA(Tir, C) - IntA(0, C)) > fabs(IntA(Tir, c) - IntA(0, c)))
-		{
-			C = c;
-		}
-	}
-	printf("C = %e\n\n", C);
-	printf("IntA from 0 to %e = %e\n\n", Tir, IntA(Tir, C) - IntA(0, C));
-    #pragma endregion
-
-    #pragma region определение пондермоторной энергии
-	Up = 9.33 * 4 * pow(1.240 / Wir, 2); // 9.33 * I[¬т/см^2 * 10^14] * lyambda[мкм]^2
+	C = -(IntA(Tir) - IntA(0)); // 20: -0.1043234466544098, 7pi: 0
     #pragma endregion
 
     #pragma region построение траекторий
 	for (int i = n < 0 ? 0 : n; n < 0 || i < n + 1; i++)
 	{
-		double to1 = fi + (i * M_PI / Wir);
+		double to1 = i * M_PI;
 		if (to1 > Tir)
 			break;
 
 		printf("\n\nstart t1 = %d * PI\n", i);
 		printf("------------------\n", i);
-		if (fabs(F(to1)) < 0.1 || trajectories(to1) == 0)
+		if (fabs(F(to1)) < 0.3 || trajectories(to1) == 0)
 		{
 			printf("nothing\n");
 		}
@@ -537,4 +484,18 @@ int work()
 	printf("\n\n");
 	return 0;
     #pragma endregion
+}
+
+int main(void)
+{
+	do
+	{
+		C = 0;
+		monochromate = 0;
+		xuv_ir = 0;
+		nextIndex = 0;
+		work();
+	} 
+	while (1 == 1);
+	return 0;
 }
