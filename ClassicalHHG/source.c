@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_multiroots.h>
-#include <gsl/gsl_integration.h>
 
 // либо это:
 //   1) идти снизу вверх
@@ -113,45 +112,6 @@ double deltaE(double t1, double t2)
 {
 	double a = Ip / (t2 - t1);
 	return a * P(t2, t1, t2) / F(t1);
-}
-#pragma endregion
-
-#pragma region для спектра
-double sqrP(double t, void* params)
-{
-	struct parameters* p = (struct parameters*)params;
-	const double t1 = (p->t1);
-	const double t2 = (p->t2);
-
-	return 2 * Up * pow(P(t, t1, t2), 2);
-}
-
-double S(double t1, double t2)
-{
-	gsl_integration_workspace * w
-		= gsl_integration_workspace_alloc(1000);
-
-	double result, error;
-	struct parameters p = { 0, t1, t2 };
-
-	gsl_function F;
-	F.function = &sqrP;
-	F.params = &p;
-
-	gsl_integration_qags(&F, t1, t2, 0, 1e-7, 1000,
-		w, &result, &error);
-
-	gsl_integration_workspace_free(w);
-	return (Ip * (t2 - t1)) + result;
-}
-
-double g_propagation(double OMEGA, double t1, double t2)
-{
-	double argument = (OMEGA * t2) - S(t1, t2);
-	double ReZ = cos(argument);
-	double ImZ = sin(argument);
-
-	return ReZ / sqrt(pow(t2 - t1, 3));
 }
 #pragma endregion
 
