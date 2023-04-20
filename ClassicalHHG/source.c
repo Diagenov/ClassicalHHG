@@ -222,9 +222,9 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 		max_t2[count][0] = max_t2[count][1] = t2;
 		max_e[count] = hhg;
 
-		printf("t1 = %.3e \n", t1);
-		printf("t2 = %.3e \n", t2);
-		printf("t = %.3e \n", t2 - t1);
+		printf("t1 = %.3e \n", t1 / 1.6);
+		printf("t2 = %.3e \n", t2 / 1.6);
+		printf("t = %.3e \n", (t2 - t1) / 1.6);
 		if (xuv_ir == 1)
 		{
 			printf("maxE = %.3e Up = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), hhg);
@@ -274,7 +274,7 @@ int trajectories(double to1)
     #pragma region отрисовка траекторий
 	for (int i = 0; i < n; i++)
 	{
-		array_t[nextIndex] = max_t2[i][0];
+		array_t[nextIndex] = max_t2[i][0] / 1.6;
 		array_E[nextIndex] = max_e[i];
 		nextIndex++;
 
@@ -391,7 +391,7 @@ int work()
 			printf("  ");
 			scanf("%lf", &Tir);
 		} 
-		while (Tir < 3 * M_PI || Tir > 10 * M_PI);
+		while (Tir < 3 * M_PI * 1.6 || Tir > 10 * M_PI * 1.6);
 		printf("\n\n");
 		Tir *= 1.6; // для перевода из фемтосекунд (fs) в безразмерные единицы (W * t, то есть 1/s * s = 1, s - секунда)
 	}
@@ -409,17 +409,18 @@ int work()
     #pragma endregion
 
     #pragma region момент ионизации
-	int n = -1;
+	double t1 = -1;
 	if (xuv_ir == 2)
 	{
-		printf("Ionization time (N * PI)\n");
+		printf("Ionization time (fs)\n");
 		do
 		{
-			printf("  N = ");
-			scanf("%d", &n);
+			printf("  ");
+			scanf("%lf", &t1);
 		} 
-		while (n < 0 || n * M_PI > Tir);
+		while (t1 < 0 || t1 * 1.6 > Tir);
 		printf("\n\n");
+		t1 *= 1.6;
 	}
     #pragma endregion
 
@@ -428,19 +429,30 @@ int work()
     #pragma endregion
 
     #pragma region построение траекторий
-	for (int i = n < 0 ? 0 : n; n < 0 || i < n + 1; i++)
+	if (xuv_ir == 2) 
+	{
+		printf("\n\nstart t1 = %.3e fs\n", t1 / 1.6);
+		printf("------------------\n");
+		if (fabs(F(t1)) < 0.3 || trajectories(t1) == 0)
+		{
+			printf("nothing\n");
+		}
+	}
+
+	for (int i = 0; xuv_ir == 1; i++)
 	{
 		double to1 = i * M_PI;
 		if (to1 > Tir)
 			break;
 
-		printf("\n\nstart t1 = %d * PI\n", i);
-		printf("------------------\n", i);
+		printf("\n\nstart t1 = %.3e fs\n", i * M_PI / 1.6);
+		printf("------------------\n");
 		if (fabs(F(to1)) < 0.3 || trajectories(to1) == 0)
 		{
 			printf("nothing\n");
 		}
 	}
+
 	writeFILE();
 	printf("\n\n");
 	return 0;
