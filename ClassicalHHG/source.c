@@ -315,7 +315,7 @@ int trajectories(double to1)
 				max_t1[i][j] = t1;
 				max_t2[i][j] = t2;
 
-				array_t[nextIndex] = t2;
+				array_t[nextIndex] = t2 / 1.6;
 				array_E[nextIndex] = E;
 				nextIndex++;
 			}
@@ -393,6 +393,7 @@ int work()
 		} 
 		while (Tir < 3 * M_PI || Tir > 10 * M_PI);
 		printf("\n\n");
+		Tir *= 1.6; // для перевода из фемтосекунд (fs) в безразмерные единицы (W * t, то есть 1/s * s = 1, s - секунда)
 	}
     #pragma endregion
 
