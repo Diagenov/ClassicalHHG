@@ -279,7 +279,7 @@ int trajectories(double to1)
 	for (int i = 0; i < n; i++)
 	{
 		array_t[nextIndex] = max_t2[i][0] / units;
-		array_E[nextIndex] = max_e[i]/* + deltaE(max_t1[i][0], max_t2[i][0])*/;
+		array_E[nextIndex] = max_e[i] + deltaE(max_t1[i][0], max_t2[i][0]);
 		nextIndex++;
 
 		for (int j = 0; j < 2; j++)
@@ -320,7 +320,7 @@ int trajectories(double to1)
 				max_t2[i][j] = t2;
 
 				array_t[nextIndex] = t2 / units;
-				array_E[nextIndex] = E/* + deltaE(t1, t2)*/;
+				array_E[nextIndex] = E + deltaE(t1, t2);
 				nextIndex++;
 			}
 		}
