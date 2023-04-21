@@ -1,53 +1,54 @@
-#define _CRT_SECURE_NO_WARNINGS
+п»ї#define _CRT_SECURE_NO_WARNINGS
 #include <stdlib.h>
 #include <stdio.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_multiroots.h>
 
-// либо это:
-//   1) идти снизу вверх
-//       + сверху вниз вторая ветка может пойти по тому же пути, что первая
-//       + позволит не рассчитывать максимальную энергию, а определять ее по построению
-//       - непонятно, как выбирать начальные условия
-// либо это:
-//   2) на каждом шаге давать приращение начальным условиям, а не только на первом
+// Р»РёР±Рѕ СЌС‚Рѕ:
+//   1) РёРґС‚Рё СЃРЅРёР·Сѓ РІРІРµСЂС…
+//       + СЃРІРµСЂС…Сѓ РІРЅРёР· РІС‚РѕСЂР°СЏ РІРµС‚РєР° РјРѕР¶РµС‚ РїРѕР№С‚Рё РїРѕ С‚РѕРјСѓ Р¶Рµ РїСѓС‚Рё, С‡С‚Рѕ РїРµСЂРІР°СЏ
+//       + РїРѕР·РІРѕР»РёС‚ РЅРµ СЂР°СЃСЃС‡РёС‚С‹РІР°С‚СЊ РјР°РєСЃРёРјР°Р»СЊРЅСѓСЋ СЌРЅРµСЂРіРёСЋ, Р° РѕРїСЂРµРґРµР»СЏС‚СЊ РµРµ РїРѕ РїРѕСЃС‚СЂРѕРµРЅРёСЋ
+//       - РЅРµРїРѕРЅСЏС‚РЅРѕ, РєР°Рє РІС‹Р±РёСЂР°С‚СЊ РЅР°С‡Р°Р»СЊРЅС‹Рµ СѓСЃР»РѕРІРёСЏ
+// Р»РёР±Рѕ СЌС‚Рѕ:
+//   2) РЅР° РєР°Р¶РґРѕРј С€Р°РіРµ РґР°РІР°С‚СЊ РїСЂРёСЂР°С‰РµРЅРёРµ РЅР°С‡Р°Р»СЊРЅС‹Рј СѓСЃР»РѕРІРёСЏРј, Р° РЅРµ С‚РѕР»СЊРєРѕ РЅР° РїРµСЂРІРѕРј
 
-#pragma region параметры IR, XUV и атома
-const double Up = 57.38;  // пондермоторная энергия, эВ
-const double Ip = 21.55;  // потенциал ионизации (Ne) эВ
-const double Wxuv = 30;   // частота XUV, эВ
-const double Wir = 1;     // частота IR, эВ
-const double Txuv = 0.55; // время XUV, фс
-double Tir = 20;    // время IR, фс
+#pragma region РїР°СЂР°РјРµС‚СЂС‹ IR, XUV Рё Р°С‚РѕРјР°
+const double Up = 57.38;  // РїРѕРЅРґРµСЂРјРѕС‚РѕСЂРЅР°СЏ СЌРЅРµСЂРіРёСЏ, СЌР’
+const double Ip = 21.55;  // РїРѕС‚РµРЅС†РёР°Р» РёРѕРЅРёР·Р°С†РёРё (Ne) СЌР’
+const double Wxuv = 30;   // С‡Р°СЃС‚РѕС‚Р° XUV, СЌР’
+const double Wir = 1;     // С‡Р°СЃС‚РѕС‚Р° IR, СЌР’
+const double Txuv = 0.55; // РІСЂРµРјСЏ XUV, С„СЃ 
+const double units = 1.5186; // РїРµСЂРµРІРѕРґРЅР°СЏ РµРґРёРЅРёС†Р° (РґР»СЏ РїРµСЂРµРІРѕРґР° С„СЃ РІ Р±РµР·СЂР°Р·РјРµСЂРЅС‹Рµ Рё РѕР±СЂР°С‚РЅРѕ)
+double Tir = 20; // РІСЂРµРјСЏ IR, С„СЃ
 #pragma endregion
 
-#pragma region выбор случая (монохромат, импульсы, IR, IR + XUV)
-int monochromate = 1; // 1 - если монохромат, 2 - если импульсы
-int xuv_ir = 1;       // 1 - если IR, 2 - если IR + XUV
+#pragma region РІС‹Р±РѕСЂ СЃР»СѓС‡Р°СЏ (РјРѕРЅРѕС…СЂРѕРјР°С‚, РёРјРїСѓР»СЊСЃС‹, IR, IR + XUV)
+int monochromate = 1; // 1 - РµСЃР»Рё РјРѕРЅРѕС…СЂРѕРјР°С‚, 2 - РµСЃР»Рё РёРјРїСѓР»СЊСЃС‹
+int xuv_ir = 1;       // 1 - РµСЃР»Рё IR, 2 - РµСЃР»Рё IR + XUV
 #pragma endregion
 
-#pragma region параметры программы
-#define N 6     // количество максимумов
-#define M 100   // количество точек на одну ветку
-#define D 10000 // ограничение на запись в файл  
+#pragma region РїР°СЂР°РјРµС‚СЂС‹ РїСЂРѕРіСЂР°РјРјС‹
+#define N 6     // РєРѕР»РёС‡РµСЃС‚РІРѕ РјР°РєСЃРёРјСѓРјРѕРІ
+#define M 100   // РєРѕР»РёС‡РµСЃС‚РІРѕ С‚РѕС‡РµРє РЅР° РѕРґРЅСѓ РІРµС‚РєСѓ
+#define D 10000 // РѕРіСЂР°РЅРёС‡РµРЅРёРµ РЅР° Р·Р°РїРёСЃСЊ РІ С„Р°Р№Р»  
 #pragma endregion
 
-#pragma region для записи в один файл
+#pragma region РґР»СЏ Р·Р°РїРёСЃРё РІ РѕРґРёРЅ С„Р°Р№Р»
 double array_t[D];
 double array_E[D];
 int nextIndex = 0;
 #pragma endregion
 
-#pragma region параметры для системы уравнений или для расчета действия S
+#pragma region РїР°СЂР°РјРµС‚СЂС‹ РґР»СЏ СЃРёСЃС‚РµРјС‹ СѓСЂР°РІРЅРµРЅРёР№ РёР»Рё РґР»СЏ СЂР°СЃС‡РµС‚Р° РґРµР№СЃС‚РІРёСЏ S
 struct parameters
 {
-	double E; // энергия HHG (или электрона, зависит от записи)
-	double t1; // время ионизации
-	double t2; // время рекомбинации 
+	double E; // СЌРЅРµСЂРіРёСЏ HHG (РёР»Рё СЌР»РµРєС‚СЂРѕРЅР°, Р·Р°РІРёСЃРёС‚ РѕС‚ Р·Р°РїРёСЃРё)
+	double t1; // РІСЂРµРјСЏ РёРѕРЅРёР·Р°С†РёРё
+	double t2; // РІСЂРµРјСЏ СЂРµРєРѕРјР±РёРЅР°С†РёРё 
 };
 #pragma endregion
 
-#pragma region функции, задающие IR-поле и импульс электрона
+#pragma region С„СѓРЅРєС†РёРё, Р·Р°РґР°СЋС‰РёРµ IR-РїРѕР»Рµ Рё РёРјРїСѓР»СЊСЃ СЌР»РµРєС‚СЂРѕРЅР°
 double C = 0;
 
 double F(double t)
@@ -107,23 +108,26 @@ double P(double t, double t1, double t2)
 {
 	return A(t) + Q(t1, t2);
 }
+#pragma endregion
 
+#pragma region РјР°РєСЃРёРјР°Р»СЊРЅР°СЏ СЌРЅРµСЂРіРёСЏ СЌР»РµРєС‚СЂРѕРЅР° (РѕС‚ РєРѕС‚РѕСЂРѕР№ Р·Р°РІРёСЃРёС‚ HHG)
 double deltaE(double t1, double t2)
 {
+	if (xuv_ir == 2)
+		return 0;
+
 	double a = Ip / (t2 - t1);
 	return a * P(t2, t1, t2) / F(t1);
 }
-#pragma endregion
 
-#pragma region максимальная гармоника
 double maxHHG(double t1, double t2)
 {
-	double deltaHHG = xuv_ir == 1 ? 0 : F(t2) * (Wxuv - Ip) / F(t1);
-	return (2 * Up * pow(A(t2) - A(t1), 2)) + deltaHHG;
+	double delta = xuv_ir == 1 ? 0 : F(t2) * (Wxuv - Ip) / F(t1);
+	return (2 * Up * pow(A(t2) - A(t1), 2)) + delta;
 }
 #pragma endregion
 
-#pragma region системы уравнений
+#pragma region СЃРёСЃС‚РµРјС‹ СѓСЂР°РІРЅРµРЅРёР№
 int maxHHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 {
 	const double t1 = gsl_vector_get(x, 0);
@@ -150,7 +154,7 @@ int HHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 	if (xuv_ir == 1)
 	{
 		e1 = P(t1, t1, t2);
-		e2 = (2 * Up * pow(P(t2, t1, t2), 2)) - E;
+		e2 = (2 * Up * pow(P(t2, t1, t2), 2)) - (E + deltaE(t1, t2));
 	}
 	else
 	{
@@ -164,7 +168,7 @@ int HHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 }
 #pragma endregion
 
-#pragma region поиск максимумов
+#pragma region РїРѕРёСЃРє РјР°РєСЃРёРјСѓРјРѕРІ
 int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 {
 	const gsl_multiroot_fsolver_type * T;
@@ -214,24 +218,24 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 		if (t1 < 0 || t2 > Tir || fabs(t2 - t1) < M_PI_4)
 			continue;
 
-		double hhg = maxHHG(t1, t2);
-		if (hhg < 5)
+		double maxE = maxHHG(t1, t2);
+		if (maxE < 5)
 			continue;
 
 		max_t1[count][0] = max_t1[count][1] = t1;
 		max_t2[count][0] = max_t2[count][1] = t2;
-		max_e[count] = hhg;
+		max_e[count] = maxE;
 
-		printf("t1 = %.3e \n", t1 / 1.6);
-		printf("t2 = %.3e \n", t2 / 1.6);
-		printf("t = %.3e \n", (t2 - t1) / 1.6);
+		printf("t1 = %.3e \n", t1 / units);
+		printf("t2 = %.3e \n", t2 / units);
+		printf("t = %.3e \n", (t2 - t1) / units);
 		if (xuv_ir == 1)
 		{
-			printf("maxE = %.3e Up = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), hhg);
+			printf("maxE = %.3e Up = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), maxE);
 		}
 		else
 		{
-			printf("maxE = %.3e Up  +  %.3e (Wxuv - Ip) = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), (F(t2) / F(t1)), hhg);
+			printf("maxE = %.3e Up  +  %.3e (Wxuv - Ip) = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), (F(t2) / F(t1)), maxE);
 		}
 		count++;
 	}
@@ -241,10 +245,10 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 }
 #pragma endregion
 
-#pragma region построение траекторий
+#pragma region РїРѕСЃС‚СЂРѕРµРЅРёРµ С‚СЂР°РµРєС‚РѕСЂРёР№
 int trajectories(double to1)
 {
-    #pragma region нахождение максимумов
+    #pragma region РЅР°С…РѕР¶РґРµРЅРёРµ РјР°РєСЃРёРјСѓРјРѕРІ
 	double max_t1[N][2];
 	double max_t2[N][2];
 	double max_e[N];
@@ -254,7 +258,7 @@ int trajectories(double to1)
 		return 0;
     #pragma endregion
 
-    #pragma region определение решателя
+    #pragma region РѕРїСЂРµРґРµР»РµРЅРёРµ СЂРµС€Р°С‚РµР»СЏ
 	const gsl_multiroot_fsolver_type * T;
 	gsl_multiroot_fsolver * s;
 
@@ -271,13 +275,9 @@ int trajectories(double to1)
 	gsl_vector * x = gsl_vector_alloc(size);
     #pragma endregion
 
-    #pragma region отрисовка траекторий
+    #pragma region РѕС‚СЂРёСЃРѕРІРєР° С‚СЂР°РµРєС‚РѕСЂРёР№
 	for (int i = 0; i < n; i++)
 	{
-		array_t[nextIndex] = max_t2[i][0] / 1.6;
-		array_E[nextIndex] = max_e[i];
-		nextIndex++;
-
 		for (int j = 0; j < 2; j++)
 		{
 			double E = max_e[i];
@@ -315,15 +315,15 @@ int trajectories(double to1)
 				max_t1[i][j] = t1;
 				max_t2[i][j] = t2;
 
-				array_t[nextIndex] = t2 / 1.6;
-				array_E[nextIndex] = E;
+				array_t[nextIndex] = t2 / units;
+				array_E[nextIndex] = E + deltaE(t1, t2);
 				nextIndex++;
 			}
 		}
 	}
     #pragma endregion
 
-    #pragma region освобождение памяти решателя
+    #pragma region РѕСЃРІРѕР±РѕР¶РґРµРЅРёРµ РїР°РјСЏС‚Рё СЂРµС€Р°С‚РµР»СЏ
 	gsl_multiroot_fsolver_free(s);
 	gsl_vector_free(x);
 	return n;
@@ -331,10 +331,10 @@ int trajectories(double to1)
 }
 #pragma endregion
 
-#pragma region запись в файл
+#pragma region Р·Р°РїРёСЃСЊ РІ С„Р°Р№Р»
 void writeFILE()
 {
-    #pragma region траектории
+    #pragma region С‚СЂР°РµРєС‚РѕСЂРёРё
 	FILE* fp;
 	fp = fopen("HHG.txt", "w");
 	for (int i = 0; i < nextIndex; i++)
@@ -344,25 +344,25 @@ void writeFILE()
 	fclose(fp);
     #pragma endregion
 
-	int K = 1000;
+	int K = 2500;
 	double dt = Tir / K;
 
-    #pragma region IR-напряженность
+    #pragma region IR-РЅР°РїСЂСЏР¶РµРЅРЅРѕСЃС‚СЊ
 	fp = fopen("F.txt", "w");
 	for (int i = 0; i < K; i++)
 	{
 		double t = i * dt;
-		fprintf(fp, "%e  %e\n", t, 35 * F(t));
+		fprintf(fp, "%e  %e\n", t / units, F(t));
 	}
 	fclose(fp);
     #pragma endregion
 
-    #pragma region IR-потенциал
+    #pragma region IR-РїРѕС‚РµРЅС†РёР°Р»
 	fp = fopen("A.txt", "w");
 	for (int i = 0; i < K; i++)
 	{
 		double t = i * dt;
-		fprintf(fp, "%e  %e\n", t, 35 * A(t));
+		fprintf(fp, "%e  %e\n", t / units, A(t));
 	}
 	fclose(fp);
     #pragma endregion
@@ -371,7 +371,7 @@ void writeFILE()
 
 int work()
 {
-    #pragma region импульсы или монохромат
+    #pragma region РёРјРїСѓР»СЊСЃС‹ РёР»Рё РјРѕРЅРѕС…СЂРѕРјР°С‚
 	printf("1 - monochromate, 2 - impulses\n");
 	do
 	{
@@ -382,7 +382,7 @@ int work()
 	printf("\n\n");
     #pragma endregion
 
-    #pragma region длина IR
+    #pragma region РґР»РёРЅР° IR
 	if (monochromate == 2)
 	{
 		printf("Impulse length (fs)\n");
@@ -391,13 +391,13 @@ int work()
 			printf("  ");
 			scanf("%lf", &Tir);
 		} 
-		while (Tir < 3 * M_PI * 1.6 || Tir > 10 * M_PI * 1.6);
+		while (Tir < 3 * M_PI * units || Tir > 10 * M_PI * units);
 		printf("\n\n");
-		Tir *= 1.6; // для перевода из фемтосекунд (fs) в безразмерные единицы (W * t, то есть 1/s * s = 1, s - секунда)
+		Tir *= units; // РґР»СЏ РїРµСЂРµРІРѕРґР° РёР· С„РµРјС‚РѕСЃРµРєСѓРЅРґ (fs) РІ Р±РµР·СЂР°Р·РјРµСЂРЅС‹Рµ РµРґРёРЅРёС†С‹ (W * t, С‚Рѕ РµСЃС‚СЊ 1/s * s = 1, s - СЃРµРєСѓРЅРґР°)
 	}
     #pragma endregion
 
-    #pragma region IR или IR + XUV
+    #pragma region IR РёР»Рё IR + XUV
 	printf("1 - IR, 2 - IR + XUV\n");
 	do
 	{
@@ -408,7 +408,7 @@ int work()
 	printf("\n\n");
     #pragma endregion
 
-    #pragma region момент ионизации
+    #pragma region РјРѕРјРµРЅС‚ РёРѕРЅРёР·Р°С†РёРё
 	double t1 = -1;
 	if (xuv_ir == 2)
 	{
@@ -418,20 +418,20 @@ int work()
 			printf("  ");
 			scanf("%lf", &t1);
 		} 
-		while (t1 < 0 || t1 * 1.6 > Tir);
+		while (t1 < 0 || t1 * units > Tir);
 		printf("\n\n");
-		t1 *= 1.6;
+		t1 *= units;
 	}
     #pragma endregion
 
-    #pragma region определение константы C
+    #pragma region РѕРїСЂРµРґРµР»РµРЅРёРµ РєРѕРЅСЃС‚Р°РЅС‚С‹ C
 	C = -(IntA(Tir) - IntA(0)); // 20: -0.1043234466544098, 7pi: 0
     #pragma endregion
 
-    #pragma region построение траекторий
+    #pragma region РїРѕСЃС‚СЂРѕРµРЅРёРµ С‚СЂР°РµРєС‚РѕСЂРёР№
 	if (xuv_ir == 2) 
 	{
-		printf("\n\nstart t1 = %.3e fs\n", t1 / 1.6);
+		printf("\n\nstart t1 = %.3e fs\n", t1 / units);
 		printf("------------------\n");
 		if (fabs(F(t1)) < 0.3 || trajectories(t1) == 0)
 		{
@@ -445,7 +445,7 @@ int work()
 		if (to1 > Tir)
 			break;
 
-		printf("\n\nstart t1 = %.3e fs\n", i * M_PI / 1.6);
+		printf("\n\nstart t1 = %.3e fs\n", i * M_PI / units);
 		printf("------------------\n");
 		if (fabs(F(to1)) < 0.3 || trajectories(to1) == 0)
 		{
