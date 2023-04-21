@@ -154,7 +154,7 @@ int HHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 	if (xuv_ir == 1)
 	{
 		e1 = P(t1, t1, t2);
-		e2 = (2 * Up * pow(P(t2, t1, t2), 2)) - (E + deltaE(t1, t2));
+		e2 = (2 * Up * pow(P(t2, t1, t2), 2)) - (E/* + deltaE(t1, t2)*/);
 	}
 	else
 	{
@@ -278,6 +278,10 @@ int trajectories(double to1)
     #pragma region отрисовка траекторий
 	for (int i = 0; i < n; i++)
 	{
+		array_t[nextIndex] = max_t2[i][0] / units;
+		array_E[nextIndex] = max_e[i]/* + deltaE(max_t1[i][0], max_t2[i][0])*/;
+		nextIndex++;
+
 		for (int j = 0; j < 2; j++)
 		{
 			double E = max_e[i];
@@ -316,7 +320,7 @@ int trajectories(double to1)
 				max_t2[i][j] = t2;
 
 				array_t[nextIndex] = t2 / units;
-				array_E[nextIndex] = E + deltaE(t1, t2);
+				array_E[nextIndex] = E/* + deltaE(t1, t2)*/;
 				nextIndex++;
 			}
 		}
