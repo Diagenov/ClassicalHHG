@@ -1,50 +1,46 @@
 ﻿#define _CRT_SECURE_NO_WARNINGS
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_multiroots.h>
 
-// либо это:
-//   1) идти снизу вверх
-//       + сверху вниз вторая ветка может пойти по тому же пути, что первая
-//       + позволит не рассчитывать максимальную энергию, а определять ее по построению
-//       - непонятно, как выбирать начальные условия
-// либо это:
-//   2) на каждом шаге давать приращение начальным условиям, а не только на первом
-
-#pragma region параметры IR, XUV и атома
-const double Up = 57.38;  // пондермоторная энергия, эВ
-const double Ip = 21.55;  // потенциал ионизации (Ne) эВ
-const double Wxuv = 30;   // частота XUV, эВ
-const double Wir = 1;     // частота IR, эВ
-const double Txuv = 0.55; // время XUV, фс 
-const double units = 1.5186; // переводная единица (для перевода фс в безразмерные и обратно)
-double Tir = 20; // время IR, фс
+#pragma region параметры полей и атомной мишени 
+double Up = 57.38; // пондермоторная энергия, эВ
+double Ip = 21.55; // потенциал ионизации (Ne) эВ
+double Wir = 1;   // частота IR, эВ
+double Tir = 20;  // время IR, фс
+double Wxuv = 30; // частота XUV, эВ
 #pragma endregion
 
-#pragma region выбор случая (монохромат, импульсы, IR, IR + XUV)
-int monochromate = 1; // 1 - если монохромат, 2 - если импульсы
-int xuv_ir = 1;       // 1 - если IR, 2 - если IR + XUV
+#pragma region вспомогательные параметры
+int xuv_ir;           // 1 - поле IR, 2 - поле IR + XUV (+), 3 - поле IR + XUV (-)
+double max_E;         // самый высокий максимум
+double max_to1;       // время ионизации, при котором достигается самый высокий максимум
+double units = 1.555; // переводная единица (для перевода фс в безразмерные и обратно) (1.5186)
 #pragma endregion
 
 #pragma region параметры программы
 #define N 6     // количество максимумов
 #define M 100   // количество точек на одну ветку
 #define D 10000 // ограничение на запись в файл  
+#define B 1000  // второе ограничение
 #pragma endregion
 
-#pragma region для записи в один файл
-double array_t[D];
+#pragma region для записи в файл
+double array_maxE[B];  
+double array_Wxuv[B];
+int nextIndex_max = 0;
+
 double array_E[D];
+double array_t[D];
 int nextIndex = 0;
 #pragma endregion
 
-#pragma region параметры для системы уравнений или для расчета действия S
+#pragma region параметры для системы уравнений
 struct parameters
 {
 	double E; // энергия HHG (или электрона, зависит от записи)
-	double t1; // время ионизации
-	double t2; // время рекомбинации 
 };
 #pragma endregion
 
@@ -53,9 +49,6 @@ double C = 0;
 
 double F(double t)
 {
-	if (monochromate == 1)
-		return cos(t);
-
 	if (t < 0 || t > Tir)
 		return 0;
 
@@ -64,9 +57,6 @@ double F(double t)
 
 double A(double t)
 {
-	if (monochromate == 1)
-		return -sin(t);
-
 	if (t < 0 || t > Tir)
 		return 0;
 
@@ -81,9 +71,6 @@ double A(double t)
 
 double IntA(double t)
 {
-	if (monochromate == 1)
-		return cos(t);
-
 	if (t < 0 || t > Tir)
 		return 0;
 
@@ -113,7 +100,7 @@ double P(double t, double t1, double t2)
 #pragma region максимальная энергия электрона (от которой зависит HHG)
 double deltaE(double t1, double t2)
 {
-	if (xuv_ir == 2)
+	if (xuv_ir != 1)
 		return 0;
 
 	double a = Ip / (t2 - t1);
@@ -158,7 +145,14 @@ int HHG_f(const gsl_vector * x, void * params, gsl_vector * func)
 	}
 	else
 	{
-		e1 = (2 * Up * pow(P(t1, t1, t2), 2)) - (Wxuv - Ip);
+		if (xuv_ir == 2)
+		{
+			e1 = P(t1, t1, t2) - sqrt((Wxuv - Ip) / (2 * Up));
+		}
+		else
+		{
+			e1 = P(t1, t1, t2) + sqrt((Wxuv - Ip) / (2 * Up));
+		}
 		e2 = (2 * Up * pow(P(t2, t1, t2), 2)) - E;
 	}
 	gsl_vector_set(func, 0, e1);
@@ -215,7 +209,7 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 		
 		double t1 = gsl_vector_get(s->x, 0);
 		double t2 = gsl_vector_get(s->x, 1);
-		if (t1 < 0 || t2 > Tir || fabs(t2 - t1) < M_PI_4)
+		if (t1 < 0 || t2 > Tir || t2 - t1 < M_PI_2)
 			continue;
 
 		double maxE = maxHHG(t1, t2);
@@ -278,10 +272,6 @@ int trajectories(double to1)
     #pragma region отрисовка траекторий
 	for (int i = 0; i < n; i++)
 	{
-		array_t[nextIndex] = max_t2[i][0] / units;
-		array_E[nextIndex] = max_e[i] + deltaE(max_t1[i][0], max_t2[i][0]);
-		nextIndex++;
-
 		for (int j = 0; j < 2; j++)
 		{
 			double E = max_e[i];
@@ -291,7 +281,7 @@ int trajectories(double to1)
 			while (E > 0)
 			{
 				E -= 1.0;
-				struct parameters p = { E, 0, 0 };
+				struct parameters p = { E };
 				func.params = &p;
 
 				gsl_vector_set(x, 0, max_t1[i][j]);
@@ -311,8 +301,17 @@ int trajectories(double to1)
 				while (status == GSL_CONTINUE && ++iter < 1000);
 
 				if (status != GSL_SUCCESS)
+				{
+					E -= 1;
 					continue;
+				}
 				
+				if (E > max_E)
+				{
+					max_E = E + 1;
+					max_to1 = to1;
+				}
+
 				double t1 = gsl_vector_get(s->x, 0);
 				double t2 = gsl_vector_get(s->x, 1);
 
@@ -336,96 +335,74 @@ int trajectories(double to1)
 #pragma endregion
 
 #pragma region запись в файл
-void writeFILE()
+void writeFILE_HHG(char* fileName)
 {
-    #pragma region траектории
 	FILE* fp;
-	fp = fopen("HHG.txt", "w");
+	fp = fopen(fileName, "w");
 	for (int i = 0; i < nextIndex; i++)
 	{
 		fprintf(fp, "%e  %e\n", array_t[i], array_E[i] + Ip);
 	}
+	nextIndex = 0;
 	fclose(fp);
-    #pragma endregion
+}
 
+void writeFILE_IR()
+{
 	int K = 2500;
 	double dt = Tir / K;
-
-    #pragma region IR-напряженность
-	fp = fopen("F.txt", "w");
+	FILE* fp = fopen("IR.txt", "w");
 	for (int i = 0; i < K; i++)
 	{
 		double t = i * dt;
 		fprintf(fp, "%e  %e\n", t / units, F(t));
 	}
 	fclose(fp);
-    #pragma endregion
+}
 
-    #pragma region IR-потенциал
-	fp = fopen("A.txt", "w");
-	for (int i = 0; i < K; i++)
+void writeFILE_maxHHG()
+{
+	FILE* fp;
+	fp = fopen("maxHHG_XUV.txt", "w");
+	for (int i = 0; i < nextIndex_max; i++)
 	{
-		double t = i * dt;
-		fprintf(fp, "%e  %e\n", t / units, A(t));
+		fprintf(fp, "%e  %e\n", array_Wxuv[i], array_maxE[i] + Ip);
 	}
+	nextIndex_max = 0;
 	fclose(fp);
-    #pragma endregion
+}
+
+void save_maxE()
+{
+	array_Wxuv[nextIndex_max] = Wxuv;
+	array_maxE[nextIndex_max] = max_E;
+	nextIndex_max++;
 }
 #pragma endregion
 
 int work()
 {
-    #pragma region импульсы или монохромат
-	printf("1 - monochromate, 2 - impulses\n");
+    #pragma region потенциал ионизации
+	printf("Atom ionization energy (eV)\n");
 	do
 	{
 		printf("  ");
-		scanf("%d", &monochromate);
+		scanf("%lf", &Ip);
 	} 
-	while (monochromate != 1 && monochromate != 2);
+	while (Ip < 3 || Ip > 30);
 	printf("\n\n");
     #pragma endregion
 
     #pragma region длина IR
-	if (monochromate == 2)
-	{
-		printf("Impulse length (fs)\n");
-		do
-		{
-			printf("  ");
-			scanf("%lf", &Tir);
-		} 
-		while (Tir < 3 * M_PI * units || Tir > 10 * M_PI * units);
-		printf("\n\n");
-		Tir *= units; // для перевода из фемтосекунд (fs) в безразмерные единицы (W * t, то есть 1/s * s = 1, s - секунда)
-	}
-    #pragma endregion
-
-    #pragma region IR или IR + XUV
-	printf("1 - IR, 2 - IR + XUV\n");
+	printf("Impulse length (fs)\n");
 	do
 	{
 		printf("  ");
-		scanf("%d", &xuv_ir);
+		scanf("%lf", &Tir);
 	} 
-	while (xuv_ir != 1 && xuv_ir != 2);
+	while (Tir < 3 * M_PI * units || Tir > 10 * M_PI * units);
 	printf("\n\n");
-    #pragma endregion
-
-    #pragma region момент ионизации
-	double t1 = -1;
-	if (xuv_ir == 2)
-	{
-		printf("Ionization time (fs)\n");
-		do
-		{
-			printf("  ");
-			scanf("%lf", &t1);
-		} 
-		while (t1 < 0 || t1 * units > Tir);
-		printf("\n\n");
-		t1 *= units;
-	}
+	Tir *= units; // для перевода из фемтосекунд (fs) в безразмерные единицы (W * t, то есть 1/s * s = 1, s - секунда)
     #pragma endregion
 
     #pragma region определение константы C
@@ -433,45 +410,68 @@ int work()
     #pragma endregion
 
     #pragma region построение траекторий
-	if (xuv_ir == 2) 
-	{
-		printf("\n\nstart t1 = %.3e fs\n", t1 / units);
-		printf("------------------\n");
-		if (fabs(F(t1)) < 0.3 || trajectories(t1) == 0)
-		{
-			printf("nothing\n");
-		}
-	}
-
-	for (int i = 0; xuv_ir == 1; i++)
+	max_E = 0;
+	xuv_ir = 1;
+	for (int i = 0;; i++)
 	{
 		double to1 = i * M_PI;
 		if (to1 > Tir)
 			break;
 
-		printf("\n\nstart t1 = %.3e fs\n", i * M_PI / units);
-		printf("------------------\n");
+		printf("\n\nstart t1 = %.3e fs", i * M_PI / units);
+		printf("\n------------------\n");
 		if (fabs(F(to1)) < 0.3 || trajectories(to1) == 0)
 		{
 			printf("nothing\n");
 		}
 	}
+	writeFILE_IR();
+	writeFILE_HHG("HHG_IR.txt");
 
-	writeFILE();
-	printf("\n\n");
-	return 0;
+	for (int i = 0; Wxuv < 80; i++)
+	{
+		Wxuv = rint(Ip) + i;
+
+		printf("\n\nWxuv = %.3e eV", Wxuv);
+		printf("\nstart t1 = %.3e fs", max_to1 / units);
+		printf("\n------------------\n");
+
+		xuv_ir = 2;
+		max_E = 0;
+		if (fabs(F(max_to1)) < 0.3 || trajectories(max_to1) == 0)
+		{
+			printf("nothing\n");
+		}
+		save_maxE();
+
+		xuv_ir = 3;
+		max_E = 0;
+		if (fabs(F(max_to1)) < 0.3 || trajectories(max_to1) == 0)
+		{
+			printf("nothing\n");
+		}
+		save_maxE();
+
+		if ((int)Wxuv % 5 == 0) 
+		{
+			char fileName[100];
+			sprintf(fileName, "%s%d%s", "HHG_XUV_", (int)Wxuv, ".txt");
+			writeFILE_HHG(fileName);
+		}
+		nextIndex = 0;
+	}
+	writeFILE_maxHHG();
     #pragma endregion
+	
+	return 0;
 }
 
 int main(void)
 {
 	do
 	{
-		C = 0;
-		monochromate = 0;
-		xuv_ir = 0;
-		nextIndex = 0;
 		work();
+		printf("\n\n\n\n");
 	} 
 	while (1 == 1);
 	return 0;
