@@ -21,7 +21,7 @@ double units = 1.555; // переводная единица (для перев�
 #pragma endregion
 
 #pragma region параметры программы
-#define N 6     // количество максимумов
+#define N 10     // количество максимумов
 #define M 100   // количество точек на одну ветку
 #define D 10000 // ограничение на запись в файл  
 #define B 1000  // второе ограничение
@@ -265,13 +265,16 @@ int trajectories(double to1)
 	{
 		for (int j = 0; j < 2; j++)
 		{
-			double E = max_e[i];
-			int sign = (2 * j) - 1;
-			max_t2[i][j] += (sign * 0.25);
+			int k = -1;
+			double E = 5;
 
-			while (E > 0)
+			int sign = (2 * j) - 1;
+			max_t2[i][j] += (sign * M_PI / 5);
+
+			while (E < max_e[i] + 10)
 			{
-				E -= 1.0;
+				k++;
+				E = 5 + (k * 0.1);
 				struct parameters p = { E };
 				func.params = &p;
 
@@ -293,13 +296,14 @@ int trajectories(double to1)
 
 				if (status != GSL_SUCCESS)
 				{
-					E -= 1;
+					k++;
+					E = 5 + (k * 0.1);
 					continue;
 				}
 				
 				if (E > max_E)
 				{
-					max_E = E + 1;
+					max_E = E;
 					max_to1 = to1;
 				}
 
@@ -309,9 +313,17 @@ int trajectories(double to1)
 				max_t1[i][j] = t1;
 				max_t2[i][j] = t2;
 
-				array_t[nextIndex] = t2 / units;
-				array_E[nextIndex] = E + deltaE(t1, t2);
-				nextIndex++;
+				if (k % 10 == 0) 
+				{
+					array_t[nextIndex] = t2 / units;
+					array_E[nextIndex] = E + deltaE(t1, t2);
+					nextIndex++;
+				}
+
+				if (t2 - t1 <= 0.05)
+				{
+					break;
+				}
 			}
 		}
 	}
@@ -391,7 +403,7 @@ int work()
 		printf("  ");
 		scanf("%lf", &Tir);
 	} 
-	while (Tir < 3 * M_PI * units || Tir > 10 * M_PI * units);
+	while (Tir * units < 3 * M_PI || Tir * units > 15 * M_PI);
 	printf("\n\n");
 	Tir *= units; // для перевода из фемтосекунд (fs) в безразмерные единицы (W * t, то есть 1/s * s = 1, s - секунда)
     #pragma endregion
@@ -416,6 +428,7 @@ int work()
 	writeFILE_IR();
 	writeFILE_HHG("HHG_IR.txt");
 
+	Wxuv = 0;
 	for (int i = 0, count = 0; Wxuv < 80; i++)
 	{
 		Wxuv = rint(Ip) + i;
