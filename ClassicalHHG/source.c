@@ -219,18 +219,6 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 		max_t1[count][0] = max_t1[count][1] = t1;
 		max_t2[count][0] = max_t2[count][1] = t2;
 		max_e[count] = maxE;
-
-		printf("t1 = %.3e \n", t1 / units);
-		printf("t2 = %.3e \n", t2 / units);
-		printf("t = %.3e \n", (t2 - t1) / units);
-		if (xuv_ir == 1)
-		{
-			printf("maxE = %.3e Up = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), maxE);
-		}
-		else
-		{
-			printf("maxE = %.3e Up  +  %.3e (Wxuv - Ip) = %.3e \n\n", 2 * pow(A(t2) - A(t1), 2), (F(t2) / F(t1)), maxE);
-		}
 		count++;
 	}
 	gsl_multiroot_fsolver_free(s);
@@ -242,6 +230,9 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 #pragma region построение траекторий
 int trajectories(double to1)
 {
+	if (fabs(F(to1)) < 0.3)
+		return 0;
+
     #pragma region нахождение максимумов
 	double max_t1[N][2];
 	double max_t2[N][2];
@@ -420,15 +411,12 @@ int work()
 
 		printf("\n\nstart t1 = %.3e fs", i * M_PI / units);
 		printf("\n------------------\n");
-		if (fabs(F(to1)) < 0.3 || trajectories(to1) == 0)
-		{
-			printf("nothing\n");
-		}
+		printf("Count of maxs = %d", trajectories(to1));
 	}
 	writeFILE_IR();
 	writeFILE_HHG("HHG_IR.txt");
 
-	for (int i = 0; Wxuv < 80; i++)
+	for (int i = 0, count = 0; Wxuv < 80; i++)
 	{
 		Wxuv = rint(Ip) + i;
 
@@ -438,19 +426,22 @@ int work()
 
 		xuv_ir = 2;
 		max_E = 0;
-		if (fabs(F(max_to1)) < 0.3 || trajectories(max_to1) == 0)
+		count = trajectories(max_to1);
+		if (count > 0)
 		{
-			printf("nothing\n");
+			save_maxE();
 		}
-		save_maxE();
+		printf("Count of maxs (+) = %d\n", count);
+		
 
 		xuv_ir = 3;
 		max_E = 0;
-		if (fabs(F(max_to1)) < 0.3 || trajectories(max_to1) == 0)
+		count = trajectories(max_to1);
+		if (count > 0)
 		{
-			printf("nothing\n");
+			save_maxE();
 		}
-		save_maxE();
+		printf("Count of maxs (-) = %d\n", count);
 
 		if ((int)Wxuv % 5 == 0) 
 		{
