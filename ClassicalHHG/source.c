@@ -23,17 +23,19 @@ double units = 1.555; // переводная единица (для перев�
 #pragma region параметры программы
 #define N 10     // количество максимумов
 #define M 100   // количество точек на одну ветку
-#define D 10000 // ограничение на запись в файл  
+#define D 5000 // ограничение на запись в файл  
 #define B 1000  // второе ограничение
 #pragma endregion
 
 #pragma region для записи в файл
-double array_maxE[B];  
+double array_maxE_plus[B];  
+double array_maxE_minus[B];
 double array_Wxuv[B];
 int nextIndex_max = 0;
 
 double array_E[D];
-double array_t[D];
+double array_t2[D];
+double array_t1[D];
 int nextIndex = 0;
 #pragma endregion
 
@@ -315,7 +317,8 @@ int trajectories(double to1)
 
 				if (k % 10 == 0) 
 				{
-					array_t[nextIndex] = t2 / units;
+					array_t1[nextIndex] = t1 / units;
+					array_t2[nextIndex] = t2 / units;
 					array_E[nextIndex] = E + deltaE(t1, t2);
 					nextIndex++;
 				}
@@ -338,13 +341,13 @@ int trajectories(double to1)
 #pragma endregion
 
 #pragma region запись в файл
-void writeFILE_HHG(char* fileName)
+void writeFILE_HHG(char * fileName)
 {
 	FILE* fp;
 	fp = fopen(fileName, "w");
 	for (int i = 0; i < nextIndex; i++)
 	{
-		fprintf(fp, "%e  %e\n", array_t[i], array_E[i] + Ip);
+		fprintf(fp, "%e  %e\n", array_t2[i], array_E[i] + Ip);
 	}
 	nextIndex = 0;
 	fclose(fp);
@@ -365,21 +368,18 @@ void writeFILE_IR()
 
 void writeFILE_maxHHG()
 {
-	FILE* fp;
+	FILE * fp;
 	fp = fopen("maxHHG_XUV.txt", "w");
 	for (int i = 0; i < nextIndex_max; i++)
 	{
-		fprintf(fp, "%e  %e\n", array_Wxuv[i], array_maxE[i] + Ip);
+		fprintf(fp, "%e  %e  %e  %e\n", 
+			array_Wxuv[i], 
+			array_maxE_plus[i] + Ip,
+			array_maxE_minus[i] + Ip,
+			array_maxE_plus[i] - array_maxE_minus[i]);
 	}
 	nextIndex_max = 0;
 	fclose(fp);
-}
-
-void save_maxE()
-{
-	array_Wxuv[nextIndex_max] = Wxuv;
-	array_maxE[nextIndex_max] = max_E;
-	nextIndex_max++;
 }
 #pragma endregion
 
@@ -412,7 +412,7 @@ int work()
 	C = -(IntA(Tir) - IntA(0)); // 20: -0.1043234466544098, 7pi: 0
     #pragma endregion
 
-    #pragma region построение траекторий
+    #pragma region построение ИК-индуцированных траекторий
 	max_E = 0;
 	xuv_ir = 1;
 	for (int i = 0;; i++)
@@ -427,42 +427,56 @@ int work()
 	}
 	writeFILE_IR();
 	writeFILE_HHG("HHG_IR.txt");
+    #pragma endregion
 
+    #pragma region построение ВУФ-индуцированных траекторий
 	Wxuv = 0;
-	for (int i = 0, count = 0; Wxuv < 80; i++)
+	for (int i = 0, count = 0; Wxuv < 90; i++)
 	{
-		Wxuv = rint(Ip) + i;
+		Wxuv = array_Wxuv[nextIndex_max] = rint(Ip) + i;
 
 		printf("\n\nWxuv = %.3e eV", Wxuv);
 		printf("\nstart t1 = %.3e fs", max_to1 / units);
 		printf("\n------------------\n");
 
+        #pragma region плюс решение
 		xuv_ir = 2;
 		max_E = 0;
 		count = trajectories(max_to1);
 		if (count > 0)
 		{
-			save_maxE();
+			array_maxE_plus[nextIndex_max] = max_E;
 		}
 		printf("Count of maxs (+) = %d\n", count);
 		
+		if ((int)Wxuv % 5 == 0 || Wxuv - Ip < 1)
+		{
+			char fileName[100];
+			sprintf(fileName, "%s%d%s", "HHG_XUV(+)_", (int)Wxuv, ".txt");
+			writeFILE_HHG(fileName);
+		}
+		nextIndex = 0;
+        #pragma endregion
 
+        #pragma region минус решение
 		xuv_ir = 3;
 		max_E = 0;
 		count = trajectories(max_to1);
 		if (count > 0)
 		{
-			save_maxE();
+			array_maxE_minus[nextIndex_max] = max_E;
 		}
 		printf("Count of maxs (-) = %d\n", count);
 
-		if ((int)Wxuv % 5 == 0) 
+		if ((int)Wxuv % 5 == 0 || Wxuv - Ip < 1)
 		{
 			char fileName[100];
-			sprintf(fileName, "%s%d%s", "HHG_XUV_", (int)Wxuv, ".txt");
+			sprintf(fileName, "%s%d%s", "HHG_XUV(-)_", (int)Wxuv, ".txt");
 			writeFILE_HHG(fileName);
 		}
 		nextIndex = 0;
+		nextIndex_max++;
+        #pragma endregion
 	}
 	writeFILE_maxHHG();
     #pragma endregion
