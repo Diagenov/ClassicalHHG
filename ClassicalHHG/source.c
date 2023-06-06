@@ -268,15 +268,17 @@ int trajectories(double to1)
 		for (int j = 0; j < 2; j++)
 		{
 			int k = -1;
-			double E = 5;
+			double E = rint(max_e[i] - 1); // 5
+			double startE = E; // +
 
 			int sign = (2 * j) - 1;
-			max_t2[i][j] += (sign * M_PI / 5);
+			max_t2[i][j] += 0.03; //(sign * M_PI / 5);
 
-			while (E < max_e[i] + 10)
+			while (E >= 5) // E < max_e[i] + 5
 			{
 				k++;
-				E = 5 + (k * 0.1);
+				E = startE - (k * 0.1); // +
+				//E = 5 + (k * 0.1);
 				struct parameters p = { E };
 				func.params = &p;
 
@@ -298,19 +300,26 @@ int trajectories(double to1)
 
 				if (status != GSL_SUCCESS)
 				{
-					k++;
-					E = 5 + (k * 0.1);
+					//k++;
+					//E = 5 + (k * 0.1);
 					continue;
 				}
 				
-				if (E > max_E)
-				{
-					max_E = E;
-					max_to1 = to1;
-				}
+				//if (E > max_E)
+				//{
+				//	max_E = E;
+				//	max_to1 = to1;
+				//}
 
 				double t1 = gsl_vector_get(s->x, 0);
 				double t2 = gsl_vector_get(s->x, 1);
+
+				if (t2 - t1 <= 0.05) // M_PI / 5 ???
+				{
+					//k++;
+					//E = 5 + (k * 0.1);
+					continue;
+				}
 
 				max_t1[i][j] = t1;
 				max_t2[i][j] = t2;
@@ -321,11 +330,6 @@ int trajectories(double to1)
 					array_t2[nextIndex] = t2 / units;
 					array_E[nextIndex] = E + deltaE(t1, t2);
 					nextIndex++;
-				}
-
-				if (t2 - t1 <= 0.05)
-				{
-					break;
 				}
 			}
 		}
@@ -431,7 +435,7 @@ int work()
 
     #pragma region построение ВУФ-индуцированных траекторий
 	Wxuv = 0;
-	for (int i = 0, count = 0; Wxuv < 90; i++)
+	for (int i = 0, count = 0; Wxuv < 120; i++)
 	{
 		Wxuv = array_Wxuv[nextIndex_max] = rint(Ip) + i;
 
