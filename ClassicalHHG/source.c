@@ -17,6 +17,7 @@ double Wxuv = 30; // частота XUV, эВ
 int xuv_ir;           // 1 - поле IR, 2 - поле IR + XUV (+), 3 - поле IR + XUV (-)
 double max_E;         // самый высокий максимум
 double max_to1;       // время ионизации, при котором достигается самый высокий максимум
+double max_n;         // порядковый номер самого высокого максимума
 double units = 1.555; // переводная единица (для перевода фс в безразмерные и обратно) (1.5186)
 #pragma endregion
 
@@ -32,6 +33,11 @@ double array_maxE_plus[B];
 double array_maxE_minus[B];
 double array_Wxuv[B];
 int nextIndex_max = 0;
+
+double array_140_plus[B][2];
+double array_140_minus[B][2];
+double array_140_Wxuv[B];
+int nextIndex_140 = 0;
 
 double array_E[D];
 double array_t2[D];
@@ -230,7 +236,7 @@ int max_t(double to1, double max_t1[N][2], double max_t2[N][2], double max_e[N])
 #pragma endregion
 
 #pragma region построение траекторий
-int trajectories(double to1)
+int trajectories(double to1, double t2_140[2])
 {
 	if (fabs(F(to1)) < 0.3)
 		return 0;
@@ -265,14 +271,22 @@ int trajectories(double to1)
     #pragma region отрисовка траекторий
 	for (int i = 0; i < n; i++)
 	{
+		if (xuv_ir == 1 && max_E < max_e[i]) // +
+		{
+			max_E = max_e[i];
+			max_to1 = to1;
+			max_n = i;
+		}
+
+		double startE = rint(max_e[i] + 3); // +
+
 		for (int j = 0; j < 2; j++)
 		{
 			int k = -1;
-			double E = rint(max_e[i] - 1); // 5
-			double startE = E; // +
+			double E = startE; // 5
 
 			int sign = (2 * j) - 1;
-			max_t2[i][j] += 0.03; //(sign * M_PI / 5);
+			max_t2[i][j] += (0.5 * sign); //(sign * M_PI / 5);
 
 			while (E >= 5) // E < max_e[i] + 5
 			{
@@ -304,12 +318,6 @@ int trajectories(double to1)
 					//E = 5 + (k * 0.1);
 					continue;
 				}
-				
-				//if (E > max_E)
-				//{
-				//	max_E = E;
-				//	max_to1 = to1;
-				//}
 
 				double t1 = gsl_vector_get(s->x, 0);
 				double t2 = gsl_vector_get(s->x, 1);
@@ -319,6 +327,18 @@ int trajectories(double to1)
 					//k++;
 					//E = 5 + (k * 0.1);
 					continue;
+				}
+
+				if (xuv_ir != 1)
+				{
+					if (E > max_E)
+					{
+						max_E = E;
+					}
+					if (max_n == i && fabs(E - (140 - Ip)) <= 0.1)
+					{
+						t2_140[j] = t2 / units;
+					}
 				}
 
 				max_t1[i][j] = t1;
@@ -385,6 +405,43 @@ void writeFILE_maxHHG()
 	nextIndex_max = 0;
 	fclose(fp);
 }
+
+void writeFILE_140() 
+{
+	FILE * fp;
+	fp = fopen("HHG(140)_XUV(+).txt", "w");
+	for (int i = 0; i < nextIndex_140; i++)
+	{
+		for (int j = 0; j < 2; j++) 
+		{
+			if (array_140_plus[i][j] == 0)
+			{
+				continue;
+			}
+			fprintf(fp, "%e  %e\n",
+				array_140_Wxuv[i],
+				array_140_plus[i][j]);
+		}
+	}
+	fclose(fp);
+
+	fp = fopen("HHG(140)_XUV(-).txt", "w");
+	for (int i = 0; i < nextIndex_140; i++)
+	{
+		for (int j = 0; j < 2; j++)
+		{
+			if (array_140_minus[i][j] == 0)
+			{
+				continue;
+			}
+			fprintf(fp, "%e  %e\n",
+				array_140_Wxuv[i],
+				array_140_minus[i][j]);
+		}
+	}
+	fclose(fp);
+	nextIndex_140 = 0;
+}
 #pragma endregion
 
 int work()
@@ -419,6 +476,8 @@ int work()
     #pragma region построение ИК-индуцированных траекторий
 	max_E = 0;
 	xuv_ir = 1;
+	double t2_140[2];
+
 	for (int i = 0;; i++)
 	{
 		double to1 = i * M_PI;
@@ -427,7 +486,7 @@ int work()
 
 		printf("\n\nstart t1 = %.3e fs", i * M_PI / units);
 		printf("\n------------------\n");
-		printf("Count of maxs = %d", trajectories(to1));
+		printf("Count of maxs = %d", trajectories(to1, t2_140));
 	}
 	writeFILE_IR();
 	writeFILE_HHG("HHG_IR.txt");
@@ -435,7 +494,7 @@ int work()
 
     #pragma region построение ВУФ-индуцированных траекторий
 	Wxuv = 0;
-	for (int i = 0, count = 0; Wxuv < 120; i++)
+	for (int i = 0, count = 0; Wxuv < 125; i++)
 	{
 		Wxuv = array_Wxuv[nextIndex_max] = rint(Ip) + i;
 
@@ -446,10 +505,15 @@ int work()
         #pragma region плюс решение
 		xuv_ir = 2;
 		max_E = 0;
-		count = trajectories(max_to1);
+		count = trajectories(max_to1, t2_140);
 		if (count > 0)
 		{
 			array_maxE_plus[nextIndex_max] = max_E;
+			array_140_plus[nextIndex_140][0] = t2_140[0];
+			array_140_plus[nextIndex_140][1] = t2_140[1];
+
+			t2_140[0] = 0;
+			t2_140[1] = 0;
 		}
 		printf("Count of maxs (+) = %d\n", count);
 		
@@ -465,10 +529,15 @@ int work()
         #pragma region минус решение
 		xuv_ir = 3;
 		max_E = 0;
-		count = trajectories(max_to1);
+		count = trajectories(max_to1, t2_140);
 		if (count > 0)
 		{
 			array_maxE_minus[nextIndex_max] = max_E;
+			array_140_minus[nextIndex_140][0] = t2_140[0];
+			array_140_minus[nextIndex_140][1] = t2_140[1];
+
+			t2_140[0] = 0;
+			t2_140[1] = 0;
 		}
 		printf("Count of maxs (-) = %d\n", count);
 
@@ -481,8 +550,12 @@ int work()
 		nextIndex = 0;
 		nextIndex_max++;
         #pragma endregion
+	
+		array_140_Wxuv[nextIndex_140] = Wxuv;
+		nextIndex_140++;
 	}
 	writeFILE_maxHHG();
+	writeFILE_140();
     #pragma endregion
 	
 	return 0;
